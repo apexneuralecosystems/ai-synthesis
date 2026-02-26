@@ -1,4 +1,4 @@
-# AI Synthesis: backend (synthesis API) + frontend (React + nginx)
+# AI Synthesis: backend (synthesis API) + frontend (React, static on 8022)
 # Usage:
 #   docker compose up -d
 #   Backend: http://localhost:8021  Frontend: http://localhost:8022
@@ -26,8 +26,4 @@ services:
     image: ai-synthesis-frontend
     ports:
       - "8022:8022"
-    environment:
-      - API_BACKEND_URL=http://backend:8021
-    depends_on:
-      - backend
     restart: unless-stopped

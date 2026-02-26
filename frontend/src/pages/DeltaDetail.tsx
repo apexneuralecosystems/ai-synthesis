@@ -56,8 +56,8 @@ export default function DeltaDetail() {
         {Array.isArray(meta.source_participants) && (
           <div className="flex flex-wrap gap-2 mt-3">{(meta.source_participants as string[]).map((p, i) => <span key={i} className="text-[12px] bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg font-medium">{p}</span>)}</div>
         )}
-        {meta.analyst_note && <p className="text-[13px] text-slate-400 italic mt-3">{meta.analyst_note as string}</p>}
-        {dr.executive_summary && <div className="mt-5 pt-5 border-t border-slate-100"><p className="text-[11px] text-blue-500 uppercase font-bold tracking-widest mb-2 flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" />Summary</p><p className="text-[15px] text-slate-700 leading-[1.75]">{dr.executive_summary as string}</p></div>}
+        {meta.analyst_note != null && <p className="text-[13px] text-slate-400 italic mt-3">{String(meta.analyst_note)}</p>}
+        {dr.executive_summary != null && <div className="mt-5 pt-5 border-t border-slate-100"><p className="text-[11px] text-blue-500 uppercase font-bold tracking-widest mb-2 flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" />Summary</p><p className="text-[15px] text-slate-700 leading-[1.75]">{String(dr.executive_summary)}</p></div>}
       </div>
 
       {/* OVERALL ASSESSMENT */}
@@ -78,8 +78,8 @@ export default function DeltaDetail() {
           </div>
           {/* Rationales */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {overall.signal_strength_rationale && <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-sm"><p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-1">Signal Rationale</p><p className="text-[14px] text-slate-700 leading-relaxed">{overall.signal_strength_rationale as string}</p></div>}
-            {overall.readiness_rationale && <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-sm"><p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-1">Readiness Rationale</p><p className="text-[14px] text-slate-700 leading-relaxed">{overall.readiness_rationale as string}</p></div>}
+            {overall.signal_strength_rationale != null && <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-sm"><p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-1">Signal Rationale</p><p className="text-[14px] text-slate-700 leading-relaxed">{String(overall.signal_strength_rationale)}</p></div>}
+            {overall.readiness_rationale != null && <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-sm"><p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-1">Readiness Rationale</p><p className="text-[14px] text-slate-700 leading-relaxed">{String(overall.readiness_rationale)}</p></div>}
           </div>
           {/* Critical gaps & next call focus */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
@@ -110,11 +110,11 @@ export default function DeltaDetail() {
               return (
                 <div key={i} className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5">
                   <div className="flex items-start justify-between gap-3">
-                    <h3 className="text-[16px] font-bold text-emerald-900">{a.pain_theme as string}</h3>
-                    <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg flex-shrink-0 ${a.validation_status === 'validated' ? 'bg-emerald-200 text-emerald-800' : 'bg-emerald-100 text-emerald-700'}`}>{(a.validation_status as string || '').replace(/_/g, ' ')}</span>
+                    <h3 className="text-[16px] font-bold text-emerald-900">{String(a.pain_theme ?? '')}</h3>
+                    <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg flex-shrink-0 ${a.validation_status === 'validated' ? 'bg-emerald-200 text-emerald-800' : 'bg-emerald-100 text-emerald-700'}`}>{String(a.validation_status ?? '').replace(/_/g, ' ')}</span>
                   </div>
-                  {a.severity_alignment_note && <p className="text-[14px] text-emerald-800 mt-2 leading-relaxed">{a.severity_alignment_note as string}</p>}
-                  {a.synthesis && <p className="text-[14px] text-emerald-700 mt-2 leading-relaxed">{a.synthesis as string}</p>}
+                  {a.severity_alignment_note != null && <p className="text-[14px] text-emerald-800 mt-2 leading-relaxed">{String(a.severity_alignment_note)}</p>}
+                  {a.synthesis != null && <p className="text-[14px] text-emerald-700 mt-2 leading-relaxed">{String(a.synthesis)}</p>}
                   {/* Severity scores */}
                   {Object.keys(sevScores).length > 0 && (
                     <div className="flex items-center gap-4 mt-3">{Object.entries(sevScores).map(([callId, score]) => (
@@ -126,7 +126,7 @@ export default function DeltaDetail() {
                     <div className="mt-4 space-y-2">{quotes.map((q, qi) => (
                       <div key={qi} className="flex items-start gap-3 bg-white/50 rounded-xl p-3.5 border border-emerald-100">
                         <Quote className="w-4 h-4 mt-0.5 flex-shrink-0 text-emerald-400" />
-                        <div><p className="text-[11px] text-emerald-500 font-bold">{q.call_id as string} &mdash; {q.stakeholder as string}</p><p className="text-[13px] italic text-emerald-700 mt-1 leading-relaxed">&ldquo;{q.quote as string}&rdquo;</p></div>
+                        <div><p className="text-[11px] text-emerald-500 font-bold">{String(q.call_id ?? '')} &mdash; {String(q.stakeholder ?? '')}</p><p className="text-[13px] italic text-emerald-700 mt-1 leading-relaxed">&ldquo;{String(q.quote ?? '')}&rdquo;</p></div>
                       </div>
                     ))}</div>
                   )}
@@ -148,22 +148,22 @@ export default function DeltaDetail() {
               return (
                 <div key={i} className="bg-red-50 border border-red-100 rounded-2xl p-5">
                   <div className="flex items-start justify-between gap-3 mb-3">
-                    <h3 className="text-[16px] font-bold text-red-900">{c.pain_theme as string}</h3>
-                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-red-100 text-red-700 flex-shrink-0">{(c.contradiction_type as string || 'conflict').replace(/_/g, ' ')}</span>
+                    <h3 className="text-[16px] font-bold text-red-900">{String(c.pain_theme ?? '')}</h3>
+                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-red-100 text-red-700 flex-shrink-0">{String(c.contradiction_type ?? 'conflict').replace(/_/g, ' ')}</span>
                   </div>
                   {/* Two perspectives */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {[{ label: 'Perspective A', p: pa }, { label: 'Perspective B', p: pb }].filter(x => Object.keys(x.p).length > 0).map(({ label, p }) => (
                       <div key={label} className="bg-white/60 rounded-xl p-4 border border-red-100">
-                        <p className="text-[10px] text-red-500 uppercase font-bold tracking-widest mb-2">{label} &mdash; <span className="font-mono">{p.call_id as string}</span></p>
-                        <p className="text-[14px] text-red-800 leading-relaxed">{p.position as string}</p>
+                        <p className="text-[10px] text-red-500 uppercase font-bold tracking-widest mb-2">{label} &mdash; <span className="font-mono">{String(p.call_id ?? '')}</span></p>
+                        <p className="text-[14px] text-red-800 leading-relaxed">{String(p.position ?? '')}</p>
                         {typeof p.severity === 'number' && <div className="mt-2 w-24"><SeverityBar score={p.severity as number} /></div>}
-                        {p.supporting_quote && <div className="flex items-start gap-2 mt-2 bg-white/50 rounded-lg p-2.5"><Quote className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-red-400" /><p className="text-[12px] italic text-red-600">&ldquo;{p.supporting_quote as string}&rdquo;</p></div>}
+                        {p.supporting_quote != null && <div className="flex items-start gap-2 mt-2 bg-white/50 rounded-lg p-2.5"><Quote className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-red-400" /><p className="text-[12px] italic text-red-600">&ldquo;{String(p.supporting_quote)}&rdquo;</p></div>}
                       </div>
                     ))}
                   </div>
-                  {c.impact_of_contradiction && <p className="text-[14px] text-red-700 mt-3 leading-relaxed"><strong>Impact:</strong> {c.impact_of_contradiction as string}</p>}
-                  {c.follow_up_required && <p className="text-[13px] text-red-600 mt-2 italic"><strong>Follow-up:</strong> {c.follow_up_required as string}</p>}
+                  {c.impact_of_contradiction != null && <p className="text-[14px] text-red-700 mt-3 leading-relaxed"><strong>Impact:</strong> {String(c.impact_of_contradiction)}</p>}
+                  {c.follow_up_required != null && <p className="text-[13px] text-red-600 mt-2 italic"><strong>Follow-up:</strong> {String(c.follow_up_required)}</p>}
                 </div>
               )
             })}
@@ -178,16 +178,16 @@ export default function DeltaDetail() {
           <div className="p-6 space-y-4">
             {unique.map((u, i) => (
               <div key={i} className="bg-purple-50 border border-purple-100 rounded-2xl p-5">
-                <h3 className="text-[15px] font-bold text-purple-900">{u.pain_theme as string}</h3>
+                <h3 className="text-[15px] font-bold text-purple-900">{String(u.pain_theme ?? '')}</h3>
                 <div className="flex items-center gap-3 mt-2 text-[12px] text-purple-600 font-medium">
-                  <span>By: {u.mentioned_by as string}</span>
-                  <span className="font-mono">{u.call_id as string}</span>
-                  {typeof u.severity_claimed === 'number' && <span>Severity: {u.severity_claimed as number}/10</span>}
+                  <span>By: {String(u.mentioned_by ?? '')}</span>
+                  <span className="font-mono">{String(u.call_id ?? '')}</span>
+                  {typeof u.severity_claimed === 'number' && <span>Severity: {Number(u.severity_claimed)}/10</span>}
                 </div>
-                {u.supporting_quote && <div className="flex items-start gap-2 mt-3 bg-white/50 rounded-xl p-3.5 border border-purple-100"><Quote className="w-4 h-4 mt-0.5 flex-shrink-0 text-purple-400" /><p className="text-[13px] italic text-purple-700">&ldquo;{u.supporting_quote as string}&rdquo;</p></div>}
-                <span className="inline-block text-[11px] font-bold px-2.5 py-1 rounded-lg bg-purple-100 text-purple-700 mt-3">{(u.validation_status as string || '').replace(/_/g, ' ')}</span>
-                {u.validation_path && <p className="text-[13px] text-purple-600 mt-2"><strong>Validation path:</strong> {u.validation_path as string}</p>}
-                {u.risk_if_ignored && <p className="text-[13px] text-purple-600 mt-1"><strong>Risk if ignored:</strong> {u.risk_if_ignored as string}</p>}
+                {u.supporting_quote != null && <div className="flex items-start gap-2 mt-3 bg-white/50 rounded-xl p-3.5 border border-purple-100"><Quote className="w-4 h-4 mt-0.5 flex-shrink-0 text-purple-400" /><p className="text-[13px] italic text-purple-700">&ldquo;{String(u.supporting_quote)}&rdquo;</p></div>}
+                <span className="inline-block text-[11px] font-bold px-2.5 py-1 rounded-lg bg-purple-100 text-purple-700 mt-3">{String(u.validation_status ?? '').replace(/_/g, ' ')}</span>
+                {u.validation_path != null && <p className="text-[13px] text-purple-600 mt-2"><strong>Validation path:</strong> {String(u.validation_path)}</p>}
+                {u.risk_if_ignored != null && <p className="text-[13px] text-purple-600 mt-1"><strong>Risk if ignored:</strong> {String(u.risk_if_ignored)}</p>}
               </div>
             ))}
           </div>
@@ -203,19 +203,19 @@ export default function DeltaDetail() {
               const estimates = (cr.estimates || []) as Record<string, unknown>[]
               return (
                 <div key={i} className="bg-slate-50 border border-slate-200 rounded-2xl p-5">
-                  <h3 className="text-[15px] font-bold text-slate-900 mb-3">{cr.pain_theme as string}</h3>
+                  <h3 className="text-[15px] font-bold text-slate-900 mb-3">{String(cr.pain_theme ?? '')}</h3>
                   <div className="space-y-2 mb-3">{estimates.map((e, ei) => (
                     <div key={ei} className="bg-white rounded-xl p-3.5 border border-slate-100 flex items-center justify-between">
-                      <div><p className="text-[12px] text-slate-500 font-mono">{e.call_id as string}</p><p className="text-[11px] text-slate-400">{e.stakeholder as string}</p></div>
-                      <div className="text-right"><p className="text-[15px] font-bold text-slate-800">{e.amount as string}</p><span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg ${e.confidence === 'high' ? 'bg-green-100 text-green-700' : e.confidence === 'medium' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>{e.confidence as string}</span></div>
+                      <div><p className="text-[12px] text-slate-500 font-mono">{String(e.call_id ?? '')}</p><p className="text-[11px] text-slate-400">{String(e.stakeholder ?? '')}</p></div>
+                      <div className="text-right"><p className="text-[15px] font-bold text-slate-800">{String(e.amount ?? '')}</p><span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg ${e.confidence === 'high' ? 'bg-green-100 text-green-700' : e.confidence === 'medium' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>{String(e.confidence ?? '')}</span></div>
                     </div>
                   ))}</div>
                   <div className="grid grid-cols-3 gap-3">
-                    {cr.range && <div className="bg-white rounded-lg p-3 border border-slate-100"><p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Range</p><p className="text-[14px] font-bold text-slate-800 mt-1">{cr.range as string}</p></div>}
-                    {cr.recommended_figure && <div className="bg-white rounded-lg p-3 border border-slate-100"><p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Recommended</p><p className="text-[14px] font-bold text-blue-700 mt-1">{cr.recommended_figure as string}</p></div>}
-                    {cr.divergence_percentage && <div className="bg-white rounded-lg p-3 border border-slate-100"><p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Divergence</p><p className="text-[14px] font-bold text-slate-800 mt-1">{cr.divergence_percentage as string}</p></div>}
+                    {cr.range != null && <div className="bg-white rounded-lg p-3 border border-slate-100"><p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Range</p><p className="text-[14px] font-bold text-slate-800 mt-1">{String(cr.range)}</p></div>}
+                    {cr.recommended_figure != null && <div className="bg-white rounded-lg p-3 border border-slate-100"><p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Recommended</p><p className="text-[14px] font-bold text-blue-700 mt-1">{String(cr.recommended_figure)}</p></div>}
+                    {cr.divergence_percentage != null && <div className="bg-white rounded-lg p-3 border border-slate-100"><p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Divergence</p><p className="text-[14px] font-bold text-slate-800 mt-1">{String(cr.divergence_percentage)}</p></div>}
                   </div>
-                  {cr.recommended_figure_rationale && <p className="text-[13px] text-slate-500 mt-3 italic">{cr.recommended_figure_rationale as string}</p>}
+                  {cr.recommended_figure_rationale != null && <p className="text-[13px] text-slate-500 mt-3 italic">{String(cr.recommended_figure_rationale)}</p>}
                 </div>
               )
             })}
@@ -233,18 +233,18 @@ export default function DeltaDetail() {
               return (
                 <div key={i} className="bg-slate-50 border border-slate-200 rounded-xl p-5 flex items-center gap-6">
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-[15px] font-bold text-slate-900">{s.pain_theme as string}</h3>
+                    <h3 className="text-[15px] font-bold text-slate-900">{String(s.pain_theme ?? '')}</h3>
                     <div className="flex items-center gap-3 mt-2">{Object.entries(orig).map(([callId, score]) => (
                       <span key={callId} className="text-[12px] bg-white px-2.5 py-1 rounded-lg border border-slate-100"><span className="text-slate-400 font-mono">{callId}:</span> <span className="font-bold text-slate-700">{score}</span></span>
                     ))}</div>
-                    {s.rationale && <p className="text-[13px] text-slate-500 mt-2">{s.rationale as string}</p>}
+                    {s.rationale != null && <p className="text-[13px] text-slate-500 mt-2">{String(s.rationale)}</p>}
                   </div>
                   <div className="flex-shrink-0 text-center">
                     <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200/60 rounded-xl px-5 py-3">
                       <p className="text-[24px] font-extrabold text-blue-700 leading-none">{String(s.updated_score)}</p>
                       <p className="text-[10px] text-blue-500 uppercase font-bold tracking-widest mt-1">Updated</p>
                     </div>
-                    {s.score_change && <p className="text-[12px] font-bold text-emerald-600 mt-1">{s.score_change as string}</p>}
+                    {s.score_change != null && <p className="text-[12px] font-bold text-emerald-600 mt-1">{String(s.score_change)}</p>}
                   </div>
                 </div>
               )
@@ -262,8 +262,8 @@ export default function DeltaDetail() {
               <div key={i} className="bg-blue-50 border border-blue-100 rounded-2xl p-5">
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div className="flex items-center gap-3">
-                    <span className="text-[20px] font-extrabold text-blue-700">#{f.rank as number || i + 1}</span>
-                    <h3 className="text-[16px] font-bold text-blue-900">{f.pain_theme as string || f.area as string}</h3>
+                    <span className="text-[20px] font-extrabold text-blue-700">#{typeof f.rank === 'number' ? f.rank : i + 1}</span>
+                    <h3 className="text-[16px] font-bold text-blue-900">{String(f.pain_theme ?? f.area ?? '')}</h3>
                   </div>
                   {f.composite_score != null && (
                     <div className="bg-blue-100 rounded-lg px-3 py-1.5 text-center">
@@ -277,9 +277,9 @@ export default function DeltaDetail() {
                   {f.cost_impact_score != null && <div className="bg-white/60 rounded-lg p-3 text-center"><p className="text-[18px] font-bold text-slate-800">{String(f.cost_impact_score)}</p><p className="text-[9px] text-slate-400 uppercase font-bold">Cost Impact</p></div>}
                   {f.agent_feasibility_score != null && <div className="bg-white/60 rounded-lg p-3 text-center"><p className="text-[18px] font-bold text-slate-800">{String(f.agent_feasibility_score)}</p><p className="text-[9px] text-slate-400 uppercase font-bold">Agent Feasibility</p></div>}
                 </div>
-                {f.composite_calculation && <p className="text-[12px] text-blue-600 font-mono bg-white/50 rounded-lg px-3 py-1.5 inline-block">{f.composite_calculation as string}</p>}
-                {f.why_this_ranks_here && <p className="text-[14px] text-blue-800 mt-3 leading-relaxed">{f.why_this_ranks_here as string}</p>}
-                {f.key_risk && <p className="text-[13px] text-blue-600 mt-2"><strong>Key risk:</strong> {f.key_risk as string}</p>}
+                {f.composite_calculation != null && <p className="text-[12px] text-blue-600 font-mono bg-white/50 rounded-lg px-3 py-1.5 inline-block">{String(f.composite_calculation)}</p>}
+                {f.why_this_ranks_here != null && <p className="text-[14px] text-blue-800 mt-3 leading-relaxed">{String(f.why_this_ranks_here)}</p>}
+                {f.key_risk != null && <p className="text-[13px] text-blue-600 mt-2"><strong>Key risk:</strong> {String(f.key_risk)}</p>}
               </div>
             ))}
           </div>
@@ -289,9 +289,9 @@ export default function DeltaDetail() {
       {/* USAGE */}
       <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-5 mb-6">
         <div className="flex items-center gap-6 text-[13px] text-slate-500 font-medium flex-wrap">
-          <span>Model: <strong className="text-slate-700">{usage.model as string}</strong></span>
+          <span>Model: <strong className="text-slate-700">{String(usage.model ?? '')}</strong></span>
           <span>Tokens: <strong className="text-slate-700">{String(usage.input_tokens).replace(/\B(?=(\d{3})+(?!\d))/g, ',')} in</strong> / <strong className="text-slate-700">{String(usage.output_tokens).replace(/\B(?=(\d{3})+(?!\d))/g, ',')} out</strong></span>
-          <span>Time: <strong className="text-slate-700">{usage.elapsed_seconds as number}s</strong></span>
+          <span>Time: <strong className="text-slate-700">{Number(usage.elapsed_seconds)}s</strong></span>
         </div>
       </div>
     </div>

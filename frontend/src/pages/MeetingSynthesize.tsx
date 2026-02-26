@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft, Loader2, CheckCircle, Mic, Play } from 'lucide-react'
 import { api } from '../lib/api'
-import type { MeetingDetail, SynthesizeResult } from '../lib/api'
+import type { MeetingDetail, SynthResult } from '../lib/api'
 
 const CALL_TYPES = [
   { value: 'CEO', label: 'CEO', desc: 'Strategic pain, financial losses, growth blockers' },
@@ -18,12 +18,12 @@ export default function MeetingSynthesize() {
   const [callType, setCallType] = useState<string>('')
   const [interviewer, setInterviewer] = useState('Anshul Jain')
   const [synthesizing, setSynthesizing] = useState(false)
-  const [result, setResult] = useState<SynthesizeResult | null>(null)
+  const [result, setResult] = useState<SynthResult | null>(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
     if (!meetingId) return
-    api.getMeeting(meetingId)
+    api.meeting(meetingId)
       .then(setMeeting)
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
@@ -34,7 +34,7 @@ export default function MeetingSynthesize() {
     setSynthesizing(true)
     setError('')
     try {
-      const res = await api.synthesizeFromMeeting(meetingId, callType, interviewer)
+      const res = await api.synthesize(meetingId, callType, interviewer)
       setResult(res)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Synthesis failed')
@@ -98,7 +98,7 @@ export default function MeetingSynthesize() {
           {result.quote_check.length > 0 && (
             <div className="p-4 rounded-xl bg-white border border-[var(--slate-200)] mb-6">
               <h4 className="text-xs font-semibold text-[var(--slate-500)] uppercase tracking-wider mb-2">Quote Spot Check</h4>
-              {result.quote_check.map((q, i) => (
+              {result.quote_check.map((q: { quote: string; found: boolean }, i: number) => (
                 <div key={i} className="flex items-center gap-2 text-xs py-1">
                   <span className={q.found ? 'text-green-600' : 'text-red-500'}>{q.found ? '✓' : '✗'}</span>
                   <span className="text-[var(--slate-600)] truncate">{q.quote}</span>

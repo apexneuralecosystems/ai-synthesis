@@ -74,17 +74,17 @@ export default function ReportDetail() {
       <div className="bg-white border border-slate-200/80 rounded-2xl p-7 mb-6 shadow-sm">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="text-[24px] font-extrabold text-slate-900 tracking-tight leading-tight">{doc.meeting_title as string || meta.call_id as string}</h1>
+            <h1 className="text-[24px] font-extrabold text-slate-900 tracking-tight leading-tight">{String(doc.meeting_title ?? meta.call_id ?? '')}</h1>
             <div className="flex flex-wrap items-center gap-3 mt-3">
               <span className={`px-3 py-1 rounded-lg text-[12px] font-bold uppercase tracking-wide ${TYPE_BADGE[callType] || 'bg-slate-100'}`}>{callType}</span>
-              <span className="text-[13px] text-slate-400 font-mono">{meta.call_id as string}</span>
-              {meta.date && <span className="text-[13px] text-slate-400 flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{meta.date as string}</span>}
-              {meta.duration_minutes && <span className="text-[13px] text-slate-400">{meta.duration_minutes as number}min</span>}
+              <span className="text-[13px] text-slate-400 font-mono">{String(meta.call_id ?? '')}</span>
+              {meta.date != null && <span className="text-[13px] text-slate-400 flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{String(meta.date)}</span>}
+              {meta.duration_minutes != null && <span className="text-[13px] text-slate-400">{Number(meta.duration_minutes)}min</span>}
             </div>
             {Array.isArray(meta.participants) && (meta.participants as string[]).length > 0 && (
               <div className="flex flex-wrap items-center gap-2 mt-2.5">
                 <User className="w-3.5 h-3.5 text-slate-400" />
-                {(meta.participants as string[]).map((p, i) => <span key={i} className="text-[12px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-lg font-medium">{p}</span>)}
+                {(meta.participants as string[]).map((p: string, i: number) => <span key={i} className="text-[12px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-lg font-medium">{p}</span>)}
               </div>
             )}
           </div>
@@ -95,13 +95,13 @@ export default function ReportDetail() {
             </div>
           )}
         </div>
-        {notEmpty(card.pain_validity_rationale) && <p className="text-[13px] text-slate-400 mt-2 italic">{card.pain_validity_rationale as string}</p>}
-        {card.executive_summary && (
+        {notEmpty(card.pain_validity_rationale) ? <p className="text-[13px] text-slate-400 mt-2 italic">{String(card.pain_validity_rationale)}</p> : null}
+        {card.executive_summary != null && String(card.executive_summary) !== '' ? (
           <div className="mt-5 pt-5 border-t border-slate-100">
             <p className="text-[11px] text-blue-500 uppercase font-bold tracking-widest mb-2 flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" />Executive Summary</p>
-            <p className="text-[15px] text-slate-700 leading-[1.75]">{card.executive_summary as string}</p>
+            <p className="text-[15px] text-slate-700 leading-[1.75]">{String(card.executive_summary)}</p>
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* PAIN POINTS */}
@@ -119,42 +119,42 @@ export default function ReportDetail() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2.5 mb-1">
-                        <span className="text-[12px] font-bold bg-white/60 text-slate-600 px-2 py-0.5 rounded-lg">{pp.id as string || `P${i + 1}`}</span>
-                        <h3 className="text-[17px] font-extrabold text-slate-900">{pp.title as string || pp.pain_label as string}</h3>
+                        <span className="text-[12px] font-bold bg-white/60 text-slate-600 px-2 py-0.5 rounded-lg">{String(pp.id ?? `P${i + 1}`)}</span>
+                        <h3 className="text-[17px] font-extrabold text-slate-900">{String(pp.title ?? pp.pain_label ?? '')}</h3>
                       </div>
-                      {notEmpty(pp.pain_category) && <p className="text-[13px] text-slate-500 font-medium">{pp.pain_category as string}</p>}
+                      {notEmpty(pp.pain_category) && <p className="text-[13px] text-slate-500 font-medium">{String(pp.pain_category)}</p>}
                     </div>
                     <div className="flex-shrink-0 w-32">
                       <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Severity</p>
                       <SeverityBar score={sev} />
                     </div>
                   </div>
-                  {pp.description && <p className="text-[15px] text-slate-700 leading-[1.7] mt-3">{pp.description as string}</p>}
-                  {notEmpty(pp.severity_rationale) && <p className="text-[13px] text-slate-500 italic mt-2">{pp.severity_rationale as string}</p>}
+                  {pp.description != null && <p className="text-[15px] text-slate-700 leading-[1.7] mt-3">{String(pp.description)}</p>}
+                  {notEmpty(pp.severity_rationale) && <p className="text-[13px] text-slate-500 italic mt-2">{String(pp.severity_rationale)}</p>}
                 </div>
 
                 <div className="bg-white/50 px-6 py-4 grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-white/80">
                   {notEmpty(cost.amount) && (
                     <div className="bg-white rounded-xl p-4 border border-slate-100">
                       <p className="text-[11px] text-slate-400 uppercase font-bold tracking-widest flex items-center gap-1.5 mb-2"><DollarSign className="w-3.5 h-3.5" />Cost Estimate</p>
-                      <p className="text-[16px] font-bold text-slate-800">{cost.amount as string}</p>
+                      <p className="text-[16px] font-bold text-slate-800">{String(cost.amount ?? '')}</p>
                       <div className="flex items-center gap-3 mt-1.5">
-                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg ${cost.confidence === 'high' ? 'bg-green-100 text-green-700' : cost.confidence === 'medium' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>{cost.confidence as string}</span>
-                        <span className="text-[11px] text-slate-400">{cost.method as string}</span>
+                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg ${cost.confidence === 'high' ? 'bg-green-100 text-green-700' : cost.confidence === 'medium' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>{String(cost.confidence ?? '')}</span>
+                        <span className="text-[11px] text-slate-400">{String(cost.method ?? '')}</span>
                       </div>
-                      {notEmpty(cost.basis) && <p className="text-[12px] text-slate-500 mt-1.5">{cost.basis as string}</p>}
+                      {notEmpty(cost.basis) && <p className="text-[12px] text-slate-500 mt-1.5">{String(cost.basis)}</p>}
                     </div>
                   )}
                   {notEmpty(pp.current_workaround) && (
                     <div className="bg-white rounded-xl p-4 border border-slate-100">
                       <p className="text-[11px] text-slate-400 uppercase font-bold tracking-widest mb-2">Current Workaround</p>
-                      <p className="text-[14px] text-slate-700 leading-relaxed">{pp.current_workaround as string}</p>
+                      <p className="text-[14px] text-slate-700 leading-relaxed">{String(pp.current_workaround)}</p>
                     </div>
                   )}
                   {notEmpty(pp.agent_opportunity) && (
                     <div className="bg-blue-50/80 rounded-xl p-4 border border-blue-100 md:col-span-2">
                       <p className="text-[11px] text-blue-500 uppercase font-bold tracking-widest flex items-center gap-1.5 mb-2"><Lightbulb className="w-3.5 h-3.5" />Agent Opportunity</p>
-                      <p className="text-[14px] text-blue-800 leading-relaxed font-medium">{pp.agent_opportunity as string}</p>
+                      <p className="text-[14px] text-blue-800 leading-relaxed font-medium">{String(pp.agent_opportunity)}</p>
                     </div>
                   )}
                   {aff.length > 0 && (
@@ -166,7 +166,7 @@ export default function ReportDetail() {
                   {notEmpty(pp.business_impact) && (
                     <div className="bg-white rounded-xl p-4 border border-slate-100">
                       <p className="text-[11px] text-slate-400 uppercase font-bold tracking-widest flex items-center gap-1.5 mb-2"><TrendingUp className="w-3.5 h-3.5" />Business Impact</p>
-                      <p className="text-[14px] text-slate-700 leading-relaxed">{pp.business_impact as string}</p>
+                      <p className="text-[14px] text-slate-700 leading-relaxed">{String(pp.business_impact)}</p>
                     </div>
                   )}
                 </div>
@@ -196,20 +196,20 @@ export default function ReportDetail() {
             {Array.isArray(ds.systems_mentioned) && (ds.systems_mentioned as string[]).length > 0 && (
               <div className="bg-slate-50 rounded-xl p-4">
                 <p className="text-[11px] text-slate-400 uppercase font-bold tracking-widest flex items-center gap-1.5 mb-2"><Server className="w-3.5 h-3.5" />Systems Mentioned</p>
-                {(ds.systems_mentioned as string[]).map((s, i) => <p key={i} className="text-[14px] text-slate-700 font-medium">{s}</p>)}
+                {(ds.systems_mentioned as string[]).map((s: string, i: number) => <p key={i} className="text-[14px] text-slate-700 font-medium">{s}</p>)}
               </div>
             )}
             {Array.isArray(ds.data_sources_identified) && (ds.data_sources_identified as string[]).length > 0 && (
               <div className="bg-slate-50 rounded-xl p-4">
                 <p className="text-[11px] text-slate-400 uppercase font-bold tracking-widest mb-2">Data Sources</p>
-                {(ds.data_sources_identified as string[]).map((s, i) => <p key={i} className="text-[14px] text-slate-700 font-medium">{s}</p>)}
+                {(ds.data_sources_identified as string[]).map((s: string, i: number) => <p key={i} className="text-[14px] text-slate-700 font-medium">{s}</p>)}
               </div>
             )}
-            {ds.access_feasibility && (
+            {ds.access_feasibility != null && (
               <div className="bg-slate-50 rounded-xl p-4">
                 <p className="text-[11px] text-slate-400 uppercase font-bold tracking-widest mb-2">Access Feasibility</p>
-                <span className={`text-[13px] font-bold px-3 py-1 rounded-lg ${ds.access_feasibility === 'easy' ? 'bg-green-100 text-green-700' : ds.access_feasibility === 'moderate' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>{ds.access_feasibility as string}</span>
-                {notEmpty(ds.access_notes) && <p className="text-[13px] text-slate-600 mt-2">{ds.access_notes as string}</p>}
+                <span className={`text-[13px] font-bold px-3 py-1 rounded-lg ${ds.access_feasibility === 'easy' ? 'bg-green-100 text-green-700' : ds.access_feasibility === 'moderate' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>{String(ds.access_feasibility)}</span>
+                {notEmpty(ds.access_notes) && <p className="text-[13px] text-slate-600 mt-2">{String(ds.access_notes)}</p>}
               </div>
             )}
           </div>
@@ -221,12 +221,12 @@ export default function ReportDetail() {
         <div className="bg-white border border-slate-200/80 rounded-2xl p-6 mb-6 shadow-sm">
           <h2 className="text-[16px] font-bold text-slate-900 flex items-center gap-2.5 mb-5"><Users className="w-5 h-5 text-blue-500" />Stakeholder Assessment</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-            {typeof sa.enthusiasm_level === 'number' && <div className="bg-slate-50 rounded-xl p-4"><p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-2">Enthusiasm</p><SeverityBar score={sa.enthusiasm_level as number} />{notEmpty(sa.enthusiasm_rationale) && <p className="text-[11px] text-slate-500 mt-2">{sa.enthusiasm_rationale as string}</p>}</div>}
-            {typeof sa.trust_level === 'number' && <div className="bg-slate-50 rounded-xl p-4"><p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-2">Trust</p><SeverityBar score={sa.trust_level as number} />{notEmpty(sa.trust_rationale) && <p className="text-[11px] text-slate-500 mt-2">{sa.trust_rationale as string}</p>}</div>}
-            {notEmpty(sa.decision_authority) && <div className="bg-slate-50 rounded-xl p-4"><p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-2">Decision Authority</p><p className="text-[14px] font-bold text-slate-700 capitalize">{sa.decision_authority as string}</p></div>}
-            {notEmpty(sa.champion_identified) && <div className="bg-slate-50 rounded-xl p-4"><p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-2">Champion</p><p className="text-[14px] font-bold text-slate-700">{sa.champion_identified as string}</p></div>}
+            {typeof sa.enthusiasm_level === 'number' && <div className="bg-slate-50 rounded-xl p-4"><p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-2">Enthusiasm</p><SeverityBar score={sa.enthusiasm_level} />{notEmpty(sa.enthusiasm_rationale) && <p className="text-[11px] text-slate-500 mt-2">{String(sa.enthusiasm_rationale)}</p>}</div>}
+            {typeof sa.trust_level === 'number' && <div className="bg-slate-50 rounded-xl p-4"><p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-2">Trust</p><SeverityBar score={sa.trust_level} />{notEmpty(sa.trust_rationale) && <p className="text-[11px] text-slate-500 mt-2">{String(sa.trust_rationale)}</p>}</div>}
+            {notEmpty(sa.decision_authority) && <div className="bg-slate-50 rounded-xl p-4"><p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-2">Decision Authority</p><p className="text-[14px] font-bold text-slate-700 capitalize">{String(sa.decision_authority)}</p></div>}
+            {notEmpty(sa.champion_identified) && <div className="bg-slate-50 rounded-xl p-4"><p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-2">Champion</p><p className="text-[14px] font-bold text-slate-700">{String(sa.champion_identified)}</p></div>}
           </div>
-          {notEmpty(sa.resistance_risks) && <div className="bg-amber-50 border border-amber-100 rounded-xl p-4"><p className="text-[11px] text-amber-600 uppercase font-bold tracking-widest mb-1.5">Resistance Risks</p><p className="text-[14px] text-amber-800">{sa.resistance_risks as string}</p></div>}
+          {notEmpty(sa.resistance_risks) && <div className="bg-amber-50 border border-amber-100 rounded-xl p-4"><p className="text-[11px] text-amber-600 uppercase font-bold tracking-widest mb-1.5">Resistance Risks</p><p className="text-[14px] text-amber-800">{String(sa.resistance_risks)}</p></div>}
         </div>
       )}
 
@@ -294,9 +294,9 @@ export default function ReportDetail() {
       {/* USAGE */}
       <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-5 mb-6">
         <div className="flex items-center gap-6 text-[13px] text-slate-500 font-medium flex-wrap">
-          <span>Model: <strong className="text-slate-700">{usage.model as string}</strong></span>
+          <span>Model: <strong className="text-slate-700">{String(usage.model ?? '')}</strong></span>
           <span>Tokens: <strong className="text-slate-700">{String(usage.input_tokens).replace(/\B(?=(\d{3})+(?!\d))/g, ',')} in</strong> / <strong className="text-slate-700">{String(usage.output_tokens).replace(/\B(?=(\d{3})+(?!\d))/g, ',')} out</strong></span>
-          <span>Time: <strong className="text-slate-700">{usage.elapsed_seconds as number}s</strong></span>
+          <span>Time: <strong className="text-slate-700">{Number(usage.elapsed_seconds)}s</strong></span>
         </div>
       </div>
     </div>

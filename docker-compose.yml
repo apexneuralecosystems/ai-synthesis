@@ -25,7 +25,7 @@ services:
       dockerfile: Dockerfile
     image: ai-synthesis-frontend
     ports:
-      - "8022:80"
+      - "8022:8022"
     environment:
       - API_BACKEND_URL=http://backend:8021
     depends_on:

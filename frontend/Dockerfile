@@ -1,6 +1,6 @@
 # Frontend: React (Vite) + nginx
 # Build: docker build -t ai-synthesis-frontend frontend
-# Run:  docker run -p 8022:80 -e API_BACKEND_URL=http://backend:8021 ai-synthesis-frontend
+# Run:  docker run -p 8022:8022 -e API_BACKEND_URL=http://backend:8021 ai-synthesis-frontend
 # With compose, API_BACKEND_URL defaults to http://backend:8021
 
 # Stage 1: build
@@ -28,7 +28,7 @@ ENV API_BACKEND_URL=http://backend:8021
 
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-EXPOSE 80
+EXPOSE 8022
 
 # Replace placeholder in nginx config with env and start nginx
 CMD ["/bin/sh", "-c", "envsubst '${API_BACKEND_URL}' < /etc/nginx/conf.d/default.conf > /tmp/default.conf && mv /tmp/default.conf /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]

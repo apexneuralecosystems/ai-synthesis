@@ -1,0 +1,138 @@
+{
+  "meeting": {
+    "meeting_id": "7560e78a-26af-4756-9e89-8c12df59b526",
+    "title": "API Transcript Storage Test",
+    "transcript": "using\nthis Apex General Assistant for the testing here what I am doing I am creating an API key from the mid-week and I am doing a Python code where it will get the meeting ID and from the meeting ID we are getting the transcripts and from the raw transcripts itself i am storing in the db like mango db or\nelse posters based on the requirement i will be storing there and after that one if it's needed whenever the person needs a engine to connect to the database based on the particular ID, then it will be converting into a summary or paint paint extractor.\nThis is what I am trying to do now.\nAnd I am testing here completely meet Apex model meet assistant so that I can get the raw data.\nFor now, for testing itself, I am using SQLite DB.\nAfter that, if everything works, then I will be moving all the data to the MongoDB.\nThank you.",
+    "transcript_sentences": [
+      {
+        "speaker": "Unknown speaker",
+        "text": "using",
+        "timestamp": "2026-02-26T12:40:51.327000+00:00"
+      },
+      {
+        "speaker": "Praveen Jogi",
+        "text": "this Apex General Assistant for the testing here what I am doing I am creating an API key from the mid-week and I am doing a Python code where it will get the meeting ID and from the meeting ID we are getting the transcripts and from the raw transcripts itself i am storing in the db like mango db or",
+        "timestamp": "2026-02-26T12:40:52.329000+00:00"
+      },
+      {
+        "speaker": "Praveen Jogi",
+        "text": "else posters based on the requirement i will be storing there and after that one if it's needed whenever the person needs a engine to connect to the database based on the particular ID, then it will be converting into a summary or paint paint extractor.",
+        "timestamp": "2026-02-26T12:41:17.664000+00:00"
+      },
+      {
+        "speaker": "Praveen Jogi",
+        "text": "This is what I am trying to do now.",
+        "timestamp": "2026-02-26T12:41:38.967000+00:00"
+      },
+      {
+        "speaker": "Praveen Jogi",
+        "text": "And I am testing here completely meet Apex model meet assistant so that I can get the raw data.",
+        "timestamp": "2026-02-26T12:41:41.409000+00:00"
+      },
+      {
+        "speaker": "Praveen Jogi",
+        "text": "For now, for testing itself, I am using SQLite DB.",
+        "timestamp": "2026-02-26T12:41:49.618000+00:00"
+      },
+      {
+        "speaker": "Praveen Jogi",
+        "text": "After that, if everything works, then I will be moving all the data to the MongoDB.",
+        "timestamp": "2026-02-26T12:41:54.202000+00:00"
+      },
+      {
+        "speaker": "Praveen Jogi",
+        "text": "Thank you.",
+        "timestamp": "2026-02-26T12:41:59.248000+00:00"
+      }
+    ],
+    "summary": null,
+    "participants": [],
+    "duration": 72,
+    "highlights": null,
+    "action_items": null,
+    "date": "2026-02-26T12:40:51Z"
+  },
+  "raw_records": [
+    {
+      "type": "meeting",
+      "payload": {
+        "meeting_id": "7560e78a-26af-4756-9e89-8c12df59b526",
+        "language": "en-US",
+        "template": {
+          "id": 1223072,
+          "name": "General meeting"
+        },
+        "host_email": "hello@apexneural.com",
+        "timestamp_start_utc": "2026-02-26T12:40:51Z",
+        "timestamp_end_utc": "2026-02-26T12:42:03Z",
+        "participant_emails": [],
+        "source": "invitation",
+        "join_link": "https://meet.google.com/scm-axvm-fwt",
+        "timezone": "UTC",
+        "title": "API Transcript Storage Test",
+        "team_ids": [],
+        "event_id": null
+      }
+    },
+    {
+      "type": "transcript",
+      "payload": {
+        "meeting_id": "7560e78a-26af-4756-9e89-8c12df59b526",
+        "sentences": [
+          {
+            "id": 1,
+            "transcript": "using",
+            "timestamp": "2026-02-26T12:40:51.327000+00:00",
+            "speaker": "Unknown speaker"
+          },
+          {
+            "id": 2,
+            "transcript": "this Apex General Assistant for the testing here what I am doing I am creating an API key from the mid-week and I am doing a Python code where it will get the meeting ID and from the meeting ID we are getting the transcripts and from the raw transcripts itself i am storing in the db like mango db or",
+            "timestamp": "2026-02-26T12:40:52.329000+00:00",
+            "speaker": "Praveen Jogi"
+          },
+          {
+            "id": 3,
+            "transcript": "else posters based on the requirement i will be storing there and after that one if it's needed whenever the person needs a engine to connect to the database based on the particular ID, then it will be converting into a summary or paint paint extractor.",
+            "timestamp": "2026-02-26T12:41:17.664000+00:00",
+            "speaker": "Praveen Jogi"
+          },
+          {
+            "id": 4,
+            "transcript": "This is what I am trying to do now.",
+            "timestamp": "2026-02-26T12:41:38.967000+00:00",
+            "speaker": "Praveen Jogi"
+          },
+          {
+            "id": 5,
+            "transcript": "And I am testing here completely meet Apex model meet assistant so that I can get the raw data.",
+            "timestamp": "2026-02-26T12:41:41.409000+00:00",
+            "speaker": "Praveen Jogi"
+          },
+          {
+            "id": 6,
+            "transcript": "For now, for testing itself, I am using SQLite DB.",
+            "timestamp": "2026-02-26T12:41:49.618000+00:00",
+            "speaker": "Praveen Jogi"
+          },
+          {
+            "id": 7,
+            "transcript": "After that, if everything works, then I will be moving all the data to the MongoDB.",
+            "timestamp": "2026-02-26T12:41:54.202000+00:00",
+            "speaker": "Praveen Jogi"
+          },
+          {
+            "id": 8,
+            "transcript": "Thank you.",
+            "timestamp": "2026-02-26T12:41:59.248000+00:00",
+            "speaker": "Praveen Jogi"
+          }
+        ],
+        "pagination": {
+          "next_cursor": "",
+          "previous_cursor": ""
+        }
+      }
+    }
+  ]
+}

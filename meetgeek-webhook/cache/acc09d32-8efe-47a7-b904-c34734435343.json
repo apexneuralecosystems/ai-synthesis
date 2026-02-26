@@ -1,0 +1,78 @@
+{
+  "meeting": {
+    "meeting_id": "acc09d32-8efe-47a7-b904-c34734435343",
+    "title": "data test",
+    "transcript": "letting to an additional assistant where it will capture the transcripts and store it in the MongoDB.\nFrom there, I want to do a analysis",
+    "transcript_sentences": [
+      {
+        "speaker": "Praveen Jogi",
+        "text": "letting to an additional assistant where it will capture the transcripts and store it in the MongoDB.",
+        "timestamp": "2026-02-26T17:59:08.902000+00:00"
+      },
+      {
+        "speaker": "Praveen Jogi",
+        "text": "From there, I want to do a analysis",
+        "timestamp": "2026-02-26T17:59:17.588000+00:00"
+      }
+    ],
+    "summary": null,
+    "participants": [
+      "praveen.jogi@apexneural.com",
+      "hello@apexneural.com"
+    ],
+    "duration": 17,
+    "highlights": null,
+    "action_items": null,
+    "date": "2026-02-26T17:59:08Z"
+  },
+  "raw_records": [
+    {
+      "type": "meeting",
+      "payload": {
+        "meeting_id": "acc09d32-8efe-47a7-b904-c34734435343",
+        "language": "en-US",
+        "template": {
+          "id": null,
+          "name": "Dynamic template"
+        },
+        "host_email": "hello@apexneural.com",
+        "timestamp_start_utc": "2026-02-26T17:59:08Z",
+        "timestamp_end_utc": "2026-02-26T17:59:25Z",
+        "participant_emails": [
+          "praveen.jogi@apexneural.com",
+          "hello@apexneural.com"
+        ],
+        "source": "google",
+        "join_link": "https://meet.google.com/hzr-ikpf-kff",
+        "timezone": "UTC",
+        "title": "data test",
+        "team_ids": [],
+        "event_id": "6rspptl0q5dhdr509fqt8cqvc8"
+      }
+    },
+    {
+      "type": "transcript",
+      "payload": {
+        "meeting_id": "acc09d32-8efe-47a7-b904-c34734435343",
+        "sentences": [
+          {
+            "id": 1,
+            "transcript": "letting to an additional assistant where it will capture the transcripts and store it in the MongoDB.",
+            "timestamp": "2026-02-26T17:59:08.902000+00:00",
+            "speaker": "Praveen Jogi"
+          },
+          {
+            "id": 2,
+            "transcript": "From there, I want to do a analysis",
+            "timestamp": "2026-02-26T17:59:17.588000+00:00",
+            "speaker": "Praveen Jogi"
+          }
+        ],
+        "pagination": {
+          "next_cursor": "",
+          "previous_cursor": ""
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+# Environment and secrets
+.env
+.env.local
+*.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Local SQLite DB (optional: remove to commit a seed DB)
+meetgeek.db
+*.db
+
+# Distribution
+build/
+dist/
+*.egg-info/

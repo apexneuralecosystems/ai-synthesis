@@ -1,0 +1,51 @@
+Anshul Jain: Meera, thank you for joining today. Rajesh mentioned you're the person who really knows how things run on the ground. I'd love to understand the operational reality from your perspective.
+
+Meera Kulkarni: Thank you, Anshul. Yes, I've been heading operations for RetailMax for the last 6 years now. I'll tell you, the reality on the ground is quite different from what Rajesh sees in his WhatsApp group.
+
+Anshul Jain: That's exactly what I want to understand. Let's start with Tally compliance. Rajesh mentioned all 47 stores use Tally. What's the actual picture?
+
+Meera Kulkarni: Okay, so here's the truth that Rajesh doesn't fully know. Yes, all 47 stores technically have Tally installed. But actual Tally compliance, meaning stores that consistently enter every transaction into Tally on the same day, is about 40 to 45 percent. Not 100 percent like Rajesh thinks.
+
+Anshul Jain: That's a significant gap. What happens at the non-compliant stores?
+
+Meera Kulkarni: This is the part that really worries me. About 8 to 10 stores are still primarily using paper registers. They write sales in a physical register and only enter it into Tally once a week, sometimes once every two weeks. Some of our smaller stores in rural Goa and interior Maharashtra, the store managers there are not comfortable with computers. They've been doing paper for years and resist changing. Rajesh doesn't know that 8 to 10 stores are still on paper. He thinks everyone is on Tally.
+
+Anshul Jain: So there's a significant visibility gap between what the CEO believes and what's actually happening?
+
+Meera Kulkarni: Absolutely. And it gets worse. Because those paper stores enter data into Tally in bulk later, the data is often wrong. They miss transactions, they enter wrong amounts, wrong product codes. When I try to reconcile the numbers at the end of the month, the data from those stores is essentially garbage.
+
+Anshul Jain: Speaking of reconciliation, tell me about your monthly process. How much time does it take?
+
+Meera Kulkarni: I'll be very precise about this because I actually tracked it recently. I spend 30 to 40 percent of my working time on manual data reconciliation. That's me, personally. I have one data analyst, Priya, who works full time on this as well. Between the two of us, we spend roughly 15 to 18 working days per month just cleaning, reconciling, and making sense of the data coming from 47 stores.
+
+Anshul Jain: Can you quantify the cost of that labor?
+
+Meera Kulkarni: My analyst Priya's salary is about 6 lakhs per year. If I factor in the portion of my own time that goes to reconciliation work instead of actual operations management, that's easily another 5 to 6 lakhs in opportunity cost. So roughly 11 to 12 lakhs per year is being spent on work that shouldn't exist if we had clean data.
+
+Anshul Jain: That's substantial. Now, Rajesh mentioned stockout losses of 8 to 10 lakhs per month. Does that align with what you see?
+
+Meera Kulkarni: No, it doesn't. It's actually worse than what Rajesh thinks. I did a detailed 6-week study three months ago where I had store managers log every customer who asked for a product we didn't have in stock. Based on that study, I estimate our actual stockout losses are 14 to 16 lakhs per month. Rajesh is going by the WhatsApp complaints he sees. But WhatsApp only captures maybe half the stockout incidents.
+
+Anshul Jain: So the CEO's estimate is roughly half the actual number?
+
+Meera Kulkarni: Yes. And the reason he doesn't have the real number is because we have no system to track missed sales. I had to do that study manually and it took me two weeks of extra work to set it up and analyze it. And even my study probably undercounts because not all store managers participated diligently.
+
+Anshul Jain: Tell me about the WhatsApp reporting that Rajesh mentioned. What's your experience with it?
+
+Meera Kulkarni: I'm the person who has to make sense of that chaos every morning. It starts at 7 AM and goes till sometimes noon because stores send reports at different times. The formats are completely inconsistent. Some send screenshots, some send text messages, some send Excel files, some just call me and dictate numbers over the phone. I then have to manually enter all of this into a master spreadsheet. It takes 2 to 3 hours every single morning.
+
+Anshul Jain: Have you tried standardizing the format?
+
+Meera Kulkarni: Many times. I've created templates, I've sent training videos, I've even gone to stores personally to train the managers. It works for about two weeks and then they go back to their old ways. The problem is there's no enforcement mechanism. If a store manager doesn't send the report or sends it in the wrong format, there's no consequence. And I don't have the authority to impose consequences, that's Rajesh's domain.
+
+Anshul Jain: What about the Suresh situation that Rajesh mentioned, the key person dependency in purchasing?
+
+Meera Kulkarni: Suresh is a walking encyclopedia of our supply chain. But from an operations perspective, the problem is that none of his knowledge is documented anywhere. When he was sick for those three weeks, I had to step in and handle purchasing. I had no idea which supplier to call for which category, what the agreed prices were, what the minimum order quantities were. I was literally calling suppliers and asking them to tell me what we usually order. It was humiliating.
+
+Anshul Jain: Is there any documentation of supplier agreements, pricing, or ordering patterns?
+
+Meera Kulkarni: Nothing formal. Suresh has some notes in a diary, a physical paper diary. That's it. No digital records, no supplier database, no purchase history that's easily accessible. I've been asking Rajesh for years to get this documented, but it never becomes a priority until there's a crisis.
+
+Anshul Jain: Thank you, Meera. This is extremely valuable. The ground reality is clearly different from the top-level view.
+
+Meera Kulkarni: I hope you can help us, Anshul. I'm drowning in manual work that shouldn't exist. If I could get even half my time back from reconciliation work, I could actually focus on improving store operations, training managers, reducing waste. Right now, I'm basically an expensive data entry operator.

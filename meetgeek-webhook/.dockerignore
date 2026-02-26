@@ -1,0 +1,14 @@
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+.git
+.env
+.env.*
+!.env.example
+*.log
+*.db
+node_modules
+dist
+.cursor

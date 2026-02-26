@@ -1,0 +1,53 @@
+Anshul Jain: Rajesh ji, thank you for taking the time today. I know you're busy managing 47 stores, so I really appreciate this. Let me start by understanding what's the single biggest operational challenge you face today?
+
+Rajesh Sharma: Anshul, I'll be very honest with you. The number one problem is I have no idea what's happening in my stores in real time. Zero visibility. I have 47 stores across Maharashtra and Goa, and I cannot tell you right now which store has stock of which product. It's embarrassing, actually. We're doing 200 crore revenue and I'm running blind.
+
+Anshul Jain: That's a significant gap. When you say no visibility, how does that translate to business impact?
+
+Rajesh Sharma: Direct financial impact. We lose roughly 8 to 10 lakhs every month in stockout losses. Customers walk in, the product isn't there, they walk out. Some of them never come back. I had one of my store managers in Pune tell me last week that a customer wanted to buy 50 units of a fast-moving SKU and we had zero stock. That's a 2 lakh order gone in one shot.
+
+Anshul Jain: And how do you currently track inventory across your stores?
+
+Rajesh Sharma: This is where it gets painful. We use Tally in all 47 stores, but each store has its own standalone Tally installation. There's no central server, no central database. So to know what stock any store has, someone has to call the store manager, and the store manager has to open Tally and check. Sometimes they don't even pick up the phone.
+
+Anshul Jain: So there's no automated inventory sync across stores?
+
+Rajesh Sharma: Nothing. Absolutely nothing. We tried to solve this two years ago. We invested 12 lakhs in a POS system from some vendor from Nagpur who promised us the moon. Cloud-based, real-time sync, mobile app, the works. Six months in, the system crashed during Diwali season. Diwali! Our biggest sales period. The vendor couldn't fix it, and eventually they just stopped responding to our calls. We lost that entire 12 lakhs and went back to standalone Tally. That experience burned me badly.
+
+Anshul Jain: I understand that frustration. Let me ask about store reporting. How do your store managers report daily numbers to you?
+
+Rajesh Sharma: WhatsApp. That's our reporting system, WhatsApp. Every morning, store managers are supposed to send their previous day's sales summary on a WhatsApp group. But here's the thing, only about 30 out of 47 stores actually do it consistently. The rest either forget, send it late, or send incomplete numbers. And the format is different every time. Some send a photo of a register, some type it out, some send a PDF from Tally. It's a nightmare to consolidate.
+
+Anshul Jain: So compliance is roughly 60-65% on daily reporting?
+
+Rajesh Sharma: Yes, something like that. Maybe even less on some days. And even when they do send it, my operations team spends hours just entering that data into a spreadsheet. It's maddening.
+
+Anshul Jain: Let me ask about your purchasing process. How do you decide what to order and when?
+
+Rajesh Sharma: This is another headache. Our entire purchasing operation depends on one person, Suresh. Suresh has been with us for 15 years. He knows every supplier, every lead time, every seasonal pattern. He carries it all in his head. Two months ago, Suresh fell sick and he was out for three weeks. In those three weeks, we had to do emergency purchases at 15-20% premium because nobody else knew what to order from whom. That cost us at least 3 lakhs in those three weeks alone.
+
+Anshul Jain: So there's a significant key-person dependency risk there.
+
+Rajesh Sharma: Absolutely. If Suresh leaves tomorrow, I'm finished. And he's 58 years old. He'll retire in two years. I lose sleep over this.
+
+Anshul Jain: What about supplier performance? Do you track which suppliers deliver on time, quality issues, pricing trends?
+
+Rajesh Sharma: No. We have no supplier performance data at all. When I negotiate with suppliers, I'm going by gut feeling and whatever Suresh tells me. I know for a fact that some suppliers are consistently late, but I can't prove it with data. Last quarter, I'm sure we overpaid on at least 2-3 categories because I had no benchmarking data.
+
+Anshul Jain: Rajesh ji, if there was a solution that could solve even two or three of these problems, what kind of investment would make sense for you?
+
+Rajesh Sharma: Look, if something genuinely works and I mean genuinely, not like that Nagpur POS disaster, I would be willing to spend 20 to 30 lakhs. Maybe even more if the ROI is clear. For the inventory visibility alone, if I can save even half of that 8-10 lakh monthly stockout loss, the system pays for itself in six months. But I need to see it working before I commit fully. I've been burned before.
+
+Anshul Jain: Understood. And in terms of decision-making, if we propose a solution, who needs to sign off?
+
+Rajesh Sharma: It's my call. This is my company. I started it 20 years ago with one store in Thane. My wife handles the finances, but the operational technology decisions are mine. If I'm convinced it works, I'll sign the check the same day.
+
+Anshul Jain: That's very clear. One last question, beyond these operational issues, what's blocking your growth right now?
+
+Rajesh Sharma: I want to expand to 75 stores in the next two years. I have the capital, I have the locations identified, I have the demand. But I cannot scale with this current chaos. If I can't manage 47 stores properly, how will I manage 75? The lack of centralized data, the WhatsApp reporting mess, the Suresh dependency, all of these become 10x worse at 75 stores. So really, solving these problems isn't just about saving money today, it's about enabling my growth plan.
+
+Anshul Jain: Thank you, Rajesh ji. This has been incredibly helpful. I have a very clear picture of your challenges. We'll put together an analysis and come back to you with specific recommendations.
+
+Rajesh Sharma: Thank you, Anshul. I'm hopeful. Just don't disappear like that Nagpur vendor, okay?
+
+Anshul Jain: You have my word on that. We'll be in touch within the week.

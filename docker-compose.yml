@@ -1,0 +1,32 @@
+# AI Synthesis: backend (synthesis API) + frontend (React + nginx)
+# Usage:
+#   docker compose up -d
+#   Backend: http://localhost:8003  Frontend: http://localhost:5173
+# Set OPENAI_API_KEY and MONGODB_URI in .env or export before up.
+
+services:
+  backend:
+    build:
+      context: ./meetgeek-webhook
+      dockerfile: Dockerfile
+    image: ai-synthesis-backend
+    ports:
+      - "8003:8003"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - MONGODB_URI=${MONGODB_URI}
+      - MONGODB_DB_NAME=${MONGODB_DB_NAME:-meetgeek}
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: ai-synthesis-frontend
+    ports:
+      - "5173:80"
+    environment:
+      - API_BACKEND_URL=http://backend:8003
+    depends_on:
+      - backend
+    restart: unless-stopped

@@ -59,6 +59,12 @@ app.add_middleware(
 app.include_router(webhook_router)
 
 
+@app.get("/")
+def root():
+    """Root route for health checks and load balancers."""
+    return {"service": "ApexNeural Agent Factory", "docs": "/docs"}
+
+
 # ═══════════════ MongoDB ═══════════════
 
 _client: MongoClient | None = None

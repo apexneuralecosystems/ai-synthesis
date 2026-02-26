@@ -19,14 +19,13 @@ logger = logging.getLogger(__name__)
 _client: AsyncIOMotorClient | None = None
 
 
-def _mongo_client_options() -> dict:
-    """Options for MongoDB client (certifi CA; optional relax TLS for dev)."""
-    opts: dict[str, Any] = {
-        "tlsCAFile": certifi.where(),
-        "serverSelectionTimeoutMS": 20000,
-    }
-    if os.environ.get("MONGODB_TLS_INSECURE") == "1":
-        opts["tlsAllowInvalidCertificates"] = True
+def _mongo_client_options(uri: str = "") -> dict:
+    """Options for MongoDB client. Only use TLS/CA for mongodb+srv (Atlas); plain mongodb:// uses no TLS."""
+    opts: dict[str, Any] = {"serverSelectionTimeoutMS": 20000}
+    if "mongodb+srv" in (uri or ""):
+        opts["tlsCAFile"] = certifi.where()
+        if os.environ.get("MONGODB_TLS_INSECURE", "").lower() in ("1", "true", "yes"):
+            opts["tlsAllowInvalidCertificates"] = True
     return opts
 
 
@@ -59,7 +58,8 @@ def get_client() -> AsyncIOMotorClient:
     """Get or create Motor client (cached)."""
     global _client
     if _client is None:
-        _client = AsyncIOMotorClient(get_effective_mongodb_uri(), **_mongo_client_options())
+        uri = get_effective_mongodb_uri()
+        _client = AsyncIOMotorClient(uri, **_mongo_client_options(uri))
     return _client
 
 

@@ -17,6 +17,7 @@ RUN pip install --no-cache-dir -r requirements.txt -r synthesis_agent/requiremen
 
 # Copy application
 COPY synthesis_agent/ synthesis_agent/
+COPY webhook.py config.py database.py ./
 
 WORKDIR /app/synthesis_agent
 

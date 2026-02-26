@@ -7,6 +7,7 @@ import logging
 import os
 import random
 import re
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,6 +24,13 @@ from pymongo import MongoClient, DESCENDING
 
 load_dotenv()
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
+# Allow importing webhook router from parent (meetgeek-webhook) when running from synthesis_agent
+_base = Path(__file__).resolve().parent.parent
+if str(_base) not in sys.path:
+    sys.path.insert(0, str(_base))
+
+from webhook import router as webhook_router
 
 BASE_DIR = Path(__file__).resolve().parent
 PROMPTS_DIR = BASE_DIR / "prompts"
@@ -47,6 +55,8 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"],
 )
+
+app.include_router(webhook_router)
 
 
 # ═══════════════ MongoDB ═══════════════

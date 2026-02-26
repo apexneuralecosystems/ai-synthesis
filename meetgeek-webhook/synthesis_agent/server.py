@@ -1,7 +1,7 @@
 """
 ApexNeural Agent Factory - AI Synthesis Backend.
-GPT-4o engine. MongoDB for meetings, reports, and delta analyses.
-"""
+GPT-4o engine. MongoDB for meetings, reports, and delta analyses.p
+""" 
 import json
 import logging
 import os

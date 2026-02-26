@@ -1,6 +1,6 @@
 # Backend: Synthesis API (FastAPI + MongoDB + GPT-4o)
 # Build: docker build -t ai-synthesis-backend -f meetgeek-webhook/Dockerfile meetgeek-webhook
-# Run:  docker run -p 8003:8003 -e OPENAI_API_KEY=... -e MONGODB_URI=... ai-synthesis-backend
+# Run:  docker run -p 8021:8021 -e OPENAI_API_KEY=... -e MONGODB_URI=... ai-synthesis-backend
 
 FROM python:3.12-slim
 
@@ -21,6 +21,6 @@ COPY synthesis_agent/ synthesis_agent/
 WORKDIR /app/synthesis_agent
 
 # No .env in image; pass OPENAI_API_KEY, MONGODB_URI, MONGODB_DB_NAME at runtime
-EXPOSE 8003
+EXPOSE 8021
 
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8003"]
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8021"]

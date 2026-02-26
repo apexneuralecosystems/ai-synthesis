@@ -1,8 +1,9 @@
 # AI Synthesis: backend (synthesis API) + frontend (React + nginx)
 # Usage:
 #   docker compose up -d
-#   Backend: http://localhost:8003  Frontend: http://localhost:5173
+#   Backend: http://localhost:8021  Frontend: http://localhost:8022
 # Set OPENAI_API_KEY and MONGODB_URI in .env or export before up.
+# CORS: backend allows origin *.
 
 services:
   backend:
@@ -11,7 +12,7 @@ services:
       dockerfile: Dockerfile
     image: ai-synthesis-backend
     ports:
-      - "8003:8003"
+      - "8021:8021"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - MONGODB_URI=${MONGODB_URI}
@@ -24,9 +25,9 @@ services:
       dockerfile: Dockerfile
     image: ai-synthesis-frontend
     ports:
-      - "5173:80"
+      - "8022:80"
     environment:
-      - API_BACKEND_URL=http://backend:8003
+      - API_BACKEND_URL=http://backend:8021
     depends_on:
       - backend
     restart: unless-stopped

@@ -1,7 +1,7 @@
 # Frontend: React (Vite) + nginx
 # Build: docker build -t ai-synthesis-frontend frontend
-# Run:  docker run -p 5173:80 -e API_BACKEND_URL=http://backend:8003 ai-synthesis-frontend
-# With compose, API_BACKEND_URL defaults to http://backend:8003
+# Run:  docker run -p 8022:80 -e API_BACKEND_URL=http://backend:8021 ai-synthesis-frontend
+# With compose, API_BACKEND_URL defaults to http://backend:8021
 
 # Stage 1: build
 FROM node:22-alpine AS builder
@@ -24,7 +24,7 @@ RUN rm /etc/nginx/conf.d/default.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Substitute API_BACKEND_URL at runtime via envsubst (default for compose)
-ENV API_BACKEND_URL=http://backend:8003
+ENV API_BACKEND_URL=http://backend:8021
 
 COPY --from=builder /app/dist /usr/share/nginx/html
 

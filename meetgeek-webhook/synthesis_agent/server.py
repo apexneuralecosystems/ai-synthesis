@@ -31,6 +31,8 @@ SCHEMAS_DIR = BASE_DIR / "schemas"
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 MONGODB_URI = os.environ.get("MONGODB_URI", "")
 MONGODB_DB = os.environ.get("MONGODB_DB_NAME", "meetgeek")
+# Use TLS CA only for mongodb+srv (Atlas). Plain mongodb:// (e.g. internal) uses no TLS by default.
+MONGODB_TLS_INSECURE = os.environ.get("MONGODB_TLS_INSECURE", "").lower() in ("1", "true", "yes")
 VALID_CALL_TYPES = ("CEO", "Operations", "Tech")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -56,7 +58,14 @@ def get_db():
     if _client is None:
         if not MONGODB_URI:
             raise HTTPException(500, "MONGODB_URI not configured")
-        _client = MongoClient(MONGODB_URI, tlsCAFile=certifi.where(), serverSelectionTimeoutMS=10000)
+        opts: dict[str, Any] = {"serverSelectionTimeoutMS": 20000}
+        uri = MONGODB_URI.strip()
+        # Only use TLS/CA for mongodb+srv (Atlas). Plain mongodb:// often has no TLS.
+        if "mongodb+srv" in uri:
+            opts["tlsCAFile"] = certifi.where()
+            if MONGODB_TLS_INSECURE:
+                opts["tlsAllowInvalidCertificates"] = True
+        _client = MongoClient(MONGODB_URI, **opts)
     return _client[MONGODB_DB]
 
 

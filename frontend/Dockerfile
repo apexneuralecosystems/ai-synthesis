@@ -40,4 +40,4 @@ ENV FRONTEND_API_BASE_URL=${VITE_API_BASE_URL}
 EXPOSE 8022
 
 # Log which backend URL this image was built against, then start the static server.
-CMD sh -c 'echo \"Starting frontend on :8022 (API base: ${FRONTEND_API_BASE_URL:-/api})\" >&2 && serve -s dist -l 8022'
+CMD ["sh", "-c", "echo \"Starting frontend on :8022 API base: ${FRONTEND_API_BASE_URL:-/api}\" >&2; serve -s dist -l 8022"]

@@ -109,7 +109,7 @@ export default function MeetingSynthesize() {
 
           <div className="flex gap-3">
             <button
-              onClick={() => navigate(`/report/report_${result.call_id}.json`)}
+              onClick={() => navigate(`/reports/${result.report_id}`)}
               className="px-5 py-2.5 text-sm rounded-lg bg-[var(--blue-600)] text-white font-medium hover:bg-[var(--blue-700)] transition-colors"
             >
               View Report

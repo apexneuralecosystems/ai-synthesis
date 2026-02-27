@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
-import type { Meeting } from '../lib/api'
-import { Search, Calendar, Clock, Users, ChevronRight, Inbox, Mic } from 'lucide-react'
+import type { Meeting, MeetingImportPayload } from '../lib/api'
+import { Search, Calendar, Clock, Users, ChevronRight, Inbox, Mic, Upload } from 'lucide-react'
 
 function formatDate(d: string) {
   if (!d) return '—'
@@ -25,15 +25,46 @@ export default function Meetings() {
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
-    api.meetings().then(setMeetings).finally(() => setLoading(false))
+    api.meetings()
+      .then(setMeetings)
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false))
   }, [])
 
   const filtered = meetings.filter(m =>
     m.title?.toLowerCase().includes(search.toLowerCase()) ||
     m.host_email?.toLowerCase().includes(search.toLowerCase())
   )
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      setUploading(true)
+      const text = await file.text()
+      const json = JSON.parse(text) as MeetingImportPayload
+      if (!json.meeting_id || !json.transcript) {
+        throw new Error('JSON must include at least "meeting_id" and "transcript" fields.')
+      }
+      await api.importMeeting(json)
+      // Refresh meetings list so the new one appears
+      const fresh = await api.meetings()
+      setMeetings(fresh)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to import meeting'
+      setError(msg)
+    } finally {
+      setUploading(false)
+      if (e.target) {
+        e.target.value = ''
+      }
+    }
+  }
 
   if (loading) {
     return (
@@ -44,12 +75,48 @@ export default function Meetings() {
     )
   }
 
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-40 gap-3">
+        <p className="text-base font-semibold text-red-600">Could not load meetings</p>
+        <p className="text-sm text-slate-500 max-w-md text-center">{error}</p>
+        <button
+          type="button"
+          onClick={() => { setError(null); setLoading(true); api.meetings().then(setMeetings).catch((e: Error) => setError(e.message)).finally(() => setLoading(false)) }}
+          className="mt-2 px-4 py-2 rounded-lg bg-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-300"
+        >
+          Retry
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div>
       {/* Page Header */}
-      <div className="mb-8">
-        <h1 className="text-[28px] font-extrabold text-slate-900 tracking-tight">Meetings</h1>
-        <p className="text-[15px] text-slate-500 mt-1.5">All recorded meetings from your workspace</p>
+      <div className="mb-8 flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-[28px] font-extrabold text-slate-900 tracking-tight">Meetings</h1>
+          <p className="text-[15px] text-slate-500 mt-1.5">All recorded meetings from your workspace</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="inline-flex items-center gap-2 rounded-2xl bg-[var(--accent)] text-white text-[13px] font-medium px-4 py-2 shadow-sm hover:bg-[var(--color-primary-dark)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+          >
+            <Upload className="w-4 h-4" />
+            {uploading ? 'Uploading...' : 'Import JSON Meeting'}
+          </button>
+        </div>
       </div>
 
       {/* Search */}

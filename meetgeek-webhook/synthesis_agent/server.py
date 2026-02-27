@@ -22,14 +22,15 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from pymongo import MongoClient, DESCENDING
 
-load_dotenv()
+# Load shared config only from the parent meetgeek-webhook .env
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-# Allow importing webhook router from parent (meetgeek-webhook) when running from synthesis_agent
 _base = Path(__file__).resolve().parent.parent
 if str(_base) not in sys.path:
     sys.path.insert(0, str(_base))
 
+from api import router as api_router
+from database import init_db
 from webhook import router as webhook_router
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -37,6 +38,7 @@ PROMPTS_DIR = BASE_DIR / "prompts"
 SCHEMAS_DIR = BASE_DIR / "schemas"
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 MONGODB_URI = os.environ.get("MONGODB_URI", "")
 MONGODB_DB = os.environ.get("MONGODB_DB_NAME", "meetgeek")
 # Use TLS CA only for mongodb+srv (Atlas). Plain mongodb:// (e.g. internal) uses no TLS by default.
@@ -46,17 +48,32 @@ VALID_CALL_TYPES = ("CEO", "Operations", "Tech")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("synthesis")
 
+# CORS: with credentials=True, browser forbids "*". Use explicit origins.
+CORS_ORIGINS_RAW = os.environ.get("CORS_ORIGINS", "").strip()
+CORS_ORIGINS = (
+    [o.strip() for o in CORS_ORIGINS_RAW.split(",") if o.strip()]
+    if CORS_ORIGINS_RAW
+    else [
+        "http://localhost:8022",
+        "http://127.0.0.1:8022",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
+)
+CORS_ALLOW_WILDCARD = os.environ.get("CORS_ALLOW_WILDCARD", "").lower() in ("1", "true", "yes")
+
 app = FastAPI(title="ApexNeural Agent Factory", version="2.0.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=["*"] if CORS_ALLOW_WILDCARD else CORS_ORIGINS,
+    allow_credentials=not CORS_ALLOW_WILDCARD,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
 )
 
 app.include_router(webhook_router)
+app.include_router(api_router, prefix="/api")
 
 
 @app.get("/")
@@ -112,18 +129,60 @@ def serialize(doc: dict) -> dict:
     return out
 
 
-# ═══════════════ LLM ═══════════════
+# ═══════════════ LLM (OpenRouter Anthropic primary, OpenAI fallback) ═══════════════
 
 def call_gpt4o(system_prompt: str, user_message: str) -> tuple[str, dict]:
-    """Call GPT-4o. Returns (text, usage)."""
+    """
+    Call Anthropic Opus via OpenRouter if configured, otherwise fall back to OpenAI GPT-4o.
+    Returns (text, usage).
+    """
     import openai
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_message},
+    ]
+
+    # Primary: Anthropic Opus 4.6 via OpenRouter (OpenAI-compatible API)
+    if OPENROUTER_API_KEY:
+        try:
+            client = openai.OpenAI(
+                api_key=OPENROUTER_API_KEY,
+                base_url="https://openrouter.ai/api/v1",
+            )
+            start = time.time()
+            resp = client.chat.completions.create(
+                model="anthropic/claude-opus-4.6",
+                messages=messages,
+                temperature=0.2,
+            )
+            elapsed = time.time() - start
+            text = resp.choices[0].message.content or ""
+            usage = {
+                "model": "anthropic/claude-opus-4.6",
+                "input_tokens": resp.usage.prompt_tokens,
+                "output_tokens": resp.usage.completion_tokens,
+                "elapsed_seconds": round(elapsed, 2),
+            }
+            logger.info(
+                "OpenRouter Anthropic Opus: %d in / %d out, %.1fs",
+                usage["input_tokens"],
+                usage["output_tokens"],
+                elapsed,
+            )
+            return text, usage
+        except Exception as e:
+            logger.warning("OpenRouter Anthropic failed, falling back to OpenAI GPT-4o: %s", e)
+
+    # Fallback: OpenAI GPT-4o
     if not OPENAI_API_KEY:
-        raise HTTPException(500, "OPENAI_API_KEY not set")
+        raise HTTPException(500, "OPENROUTER_API_KEY or OPENAI_API_KEY must be set")
+
     client = openai.OpenAI(api_key=OPENAI_API_KEY)
     start = time.time()
     resp = client.chat.completions.create(
         model="gpt-4o",
-        messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_message}],
+        messages=messages,
         temperature=0.2,
     )
     elapsed = time.time() - start
@@ -134,7 +193,7 @@ def call_gpt4o(system_prompt: str, user_message: str) -> tuple[str, dict]:
         "output_tokens": resp.usage.completion_tokens,
         "elapsed_seconds": round(elapsed, 2),
     }
-    logger.info("GPT-4o: %d in / %d out, %.1fs", usage["input_tokens"], usage["output_tokens"], elapsed)
+    logger.info("GPT-4o fallback: %d in / %d out, %.1fs", usage["input_tokens"], usage["output_tokens"], elapsed)
     return text, usage
 
 
@@ -195,10 +254,24 @@ class DeltaReq(BaseModel):
     report_ids: list[str]
 
 
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+
+class ChatReq(BaseModel):
+    messages: list[ChatMessage]
+
+
 # ═══════════════ Startup ═══════════════
 
 @app.on_event("startup")
 async def startup():
+    # Run async Mongo migrations (indexes, collections) and ensure report collections.
+    try:
+        await init_db()
+    except Exception as e:
+        logger.warning("MongoDB migrations failed or skipped in startup: %s", e)
     ensure_collections()
 
 
@@ -206,47 +279,60 @@ async def startup():
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "llm": "gpt-4o", "api_key_set": bool(OPENAI_API_KEY)}
+    return {
+        "status": "ok",
+        "llm": "gpt-4o",
+        "api_key_set": bool(OPENAI_API_KEY),
+    }
 
 
-@app.get("/api/meetings")
-async def list_meetings():
-    """List all meetings with essential fields."""
+@app.post("/api/meetings/{meeting_id}/chat")
+async def chat_with_meeting(meeting_id: str, body: ChatReq):
+    """
+    Lightweight chat endpoint scoped to a single meeting transcript.
+    The client sends prior messages; we respond with the next assistant message.
+    """
     db = get_db()
-    cursor = db["meetings"].find({}, {
-        "meeting_id": 1, "title": 1, "date": 1, "date_end": 1,
-        "duration": 1, "participants": 1, "source": 1,
-        "host_email": 1, "language": 1, "_id": 0,
-    }).sort("date", DESCENDING)
-    meetings = []
-    for m in cursor:
-        if isinstance(m.get("date"), datetime):
-            m["date"] = m["date"].isoformat()
-        if isinstance(m.get("date_end"), datetime):
-            m["date_end"] = m["date_end"].isoformat()
-        has_transcript = False
-        full = db["meetings"].find_one({"meeting_id": m["meeting_id"]}, {"transcript_sentences": 1, "transcript": 1, "_id": 0})
-        if full:
-            sents = full.get("transcript_sentences") or []
-            has_transcript = len(sents) > 0 or bool(full.get("transcript", "").strip())
-        m["has_transcript"] = has_transcript
-        meetings.append(m)
-    return meetings
-
-
-@app.get("/api/meetings/{meeting_id}")
-async def get_meeting(meeting_id: str):
-    """Full meeting with transcript sentences."""
-    db = get_db()
-    doc = db["meetings"].find_one({"meeting_id": meeting_id}, {"_id": 0})
-    if not doc:
+    meeting = db["meetings"].find_one({"meeting_id": meeting_id}, {"_id": 0})
+    if not meeting:
         raise HTTPException(404, "Meeting not found")
-    if isinstance(doc.get("date"), datetime):
-        doc["date"] = doc["date"].isoformat()
-    if isinstance(doc.get("date_end"), datetime):
-        doc["date_end"] = doc["date_end"].isoformat()
-    doc["transcript_text"] = extract_transcript_text(doc)
-    return doc
+
+    transcript = extract_transcript_text(meeting)
+    if not transcript.strip():
+        raise HTTPException(400, "Meeting has no transcript text")
+
+    title = meeting.get("title") or meeting.get("meeting_id") or meeting_id
+    date = meeting.get("date")
+    meta_lines: list[str] = [f"Meeting title: {title}"]
+    if date:
+        meta_lines.append(f"Meeting date: {date}")
+    system_prompt = (
+        "You are ApexNeural's meeting analysis assistant.\n"
+        "You must answer questions using ONLY the metadata and transcript below. "
+        "If something is not present there, say you don't know.\n\n"
+        + "=== MEETING METADATA ===\n"
+        + "\n".join(str(x) for x in meta_lines)
+        + "\n\n=== TRANSCRIPT ===\n"
+        f"{transcript}\n"
+        "=== END TRANSCRIPT ==="
+    )
+
+    convo_lines: list[str] = []
+    for m in body.messages:
+        role = (m.role or "").strip().lower()
+        if role not in ("user", "assistant"):
+            continue
+        prefix = "User" if role == "user" else "Assistant"
+        convo_lines.append(f"{prefix}: {m.content}")
+
+    user_message = "\n\n".join(convo_lines) if convo_lines else "Summarise the key points of this meeting."
+
+    try:
+        text, usage = call_gpt4o(system_prompt, user_message)
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+    return {"reply": text, "usage": usage}
 
 
 # ═══════════════ Pain Report Endpoints ═══════════════

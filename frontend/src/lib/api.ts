@@ -80,9 +80,33 @@ export interface DeltaResult {
   usage: { model: string; input_tokens: number; output_tokens: number; elapsed_seconds: number }
 }
 
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+export interface MeetingImportPayload {
+  meeting_id: string
+  title?: string | null
+  transcript: string
+  transcript_sentences?: TranscriptSentence[] | null
+  participants?: string[] | null
+  source?: string | null
+  host_email?: string | null
+  language?: string | null
+  date?: string | null
+  duration_seconds?: number | null
+}
+
+/** Normalize /meetings: backend may return array or { meetings: array } */
+async function meetingsList(): Promise<Meeting[]> {
+  const r = await req<Meeting[] | { meetings?: Meeting[] }>('/meetings')
+  return Array.isArray(r) ? r : (r?.meetings ?? [])
+}
+
 export const api = {
   health: () => req<{ status: string }>('/health'),
-  meetings: () => req<Meeting[]>('/meetings'),
+  meetings: meetingsList,
   meeting: (id: string) => req<MeetingDetail>(`/meetings/${id}`),
   reports: () => req<PainReportItem[]>('/reports'),
   report: (id: string) => req<Record<string, unknown>>(`/reports/${id}`),
@@ -97,4 +121,18 @@ export const api = {
   deleteDelta: (id: string) => req<{ status: string }>(`/deltas/${id}`, { method: 'DELETE' }),
   runDelta: (reportIds: string[]) =>
     req<DeltaResult>('/delta', { method: 'POST', body: JSON.stringify({ report_ids: reportIds }) }),
+  meetingChat: (meetingId: string, messages: ChatMessage[]) =>
+    req<{ reply: string; usage: Record<string, unknown> }>(`/meetings/${meetingId}/chat`, {
+      method: 'POST',
+      body: JSON.stringify({ messages }),
+    }),
+  importMeeting: (payload: MeetingImportPayload) =>
+    req<MeetingDetail>('/meetings/import', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  clearTranscript: (meetingId: string) =>
+    req<MeetingDetail>(`/meetings/${meetingId}/transcript`, {
+      method: 'DELETE',
+    }),
 }

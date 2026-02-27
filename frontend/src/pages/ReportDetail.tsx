@@ -50,8 +50,25 @@ export default function ReportDetail() {
     api.report(id).then(setDoc).catch(e => setError(e.message)).finally(() => setLoading(false))
   }, [id])
 
-  if (loading) return <div className="flex flex-col items-center justify-center py-40 gap-3"><div className="w-8 h-8 border-[3px] border-blue-600 border-t-transparent rounded-full animate-spin" /><p className="text-sm text-slate-400 font-medium">Loading report...</p></div>
-  if (error || !doc) return <div className="text-center py-20"><p className="text-red-500 text-base font-semibold">{error || 'Not found'}</p><Link to="/reports" className="text-blue-600 text-sm mt-3 inline-block hover:underline">&larr; Back</Link></div>
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-40 gap-3">
+        <div className="w-8 h-8 border-[3px] border-blue-600 border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm text-slate-400 font-medium">Loading report...</p>
+      </div>
+    )
+  }
+
+  if (error || !doc) {
+    return (
+      <div className="text-center py-20">
+        <p className="text-red-500 text-base font-semibold">{error || 'Not found'}</p>
+        <Link to="/reports" className="text-blue-600 text-sm mt-3 inline-block hover:underline">
+          &larr; Back
+        </Link>
+      </div>
+    )
+  }
 
   const card = (doc.report_card || {}) as Record<string, unknown>
   const meta = (card.meta || {}) as Record<string, unknown>
@@ -67,15 +84,26 @@ export default function ReportDetail() {
   const usage = (doc.usage || {}) as Record<string, unknown>
 
   return (
-    <div>
-      <Link to="/reports" className="inline-flex items-center gap-2 text-[13px] font-semibold text-slate-500 hover:text-blue-600 mb-6 transition-colors"><ArrowLeft className="w-4 h-4" />All Reports</Link>
+    <div className="space-y-7">
+      <Link
+        to="/reports"
+        className="inline-flex items-center gap-2 text-[13px] font-semibold text-slate-500 hover:text-blue-600 transition-colors"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        All Reports
+      </Link>
 
       {/* HEADER */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl p-7 mb-6 shadow-sm">
+      <div className="bg-white border border-slate-200/80 rounded-3xl p-8 shadow-sm">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="text-[24px] font-extrabold text-slate-900 tracking-tight leading-tight">{String(doc.meeting_title ?? meta.call_id ?? '')}</h1>
-            <div className="flex flex-wrap items-center gap-3 mt-3">
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-[0.22em] mb-2">
+              Pain Report Card
+            </p>
+            <h1 className="text-[26px] font-extrabold text-slate-900 tracking-tight leading-tight">
+              {String(doc.meeting_title ?? meta.call_id ?? '')}
+            </h1>
+            <div className="flex flex-wrap items-center gap-3 mt-3 text-[13px]">
               <span className={`px-3 py-1 rounded-lg text-[12px] font-bold uppercase tracking-wide ${TYPE_BADGE[callType] || 'bg-slate-100'}`}>{callType}</span>
               <span className="text-[13px] text-slate-400 font-mono">{String(meta.call_id ?? '')}</span>
               {meta.date != null && <span className="text-[13px] text-slate-400 flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{String(meta.date)}</span>}
@@ -89,8 +117,10 @@ export default function ReportDetail() {
             )}
           </div>
           {card.pain_validity_score != null && (
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200/60 rounded-2xl px-6 py-4 text-center flex-shrink-0">
-              <p className="text-[32px] font-extrabold text-blue-700 leading-none">{String(card.pain_validity_score)}</p>
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200/60 rounded-2xl px-7 py-4 text-center flex-shrink-0">
+              <p className="hero-metric text-[32px] font-extrabold text-blue-700 leading-none">
+                {String(card.pain_validity_score)}
+              </p>
               <p className="text-[10px] text-blue-500 uppercase font-bold tracking-widest mt-1.5">Pain Validity</p>
             </div>
           )}
@@ -106,7 +136,11 @@ export default function ReportDetail() {
 
       {/* PAIN POINTS */}
       <div className="mb-8">
-        <h2 className="text-[18px] font-extrabold text-slate-900 flex items-center gap-2.5 mb-5"><AlertTriangle className="w-5 h-5 text-red-500" />Pain Points <span className="text-[14px] font-semibold text-slate-400">({painPoints.length})</span></h2>
+        <h2 className="text-[18px] font-extrabold text-slate-900 flex items-center gap-2.5 mb-5">
+          <AlertTriangle className="w-5 h-5 text-red-500" />
+          Pain Points
+          <span className="text-[14px] font-semibold text-slate-400">({painPoints.length})</span>
+        </h2>
         <div className="space-y-5">
           {painPoints.map((pp, i) => {
             const sev = typeof pp.severity === 'number' ? pp.severity : 5
@@ -114,12 +148,14 @@ export default function ReportDetail() {
             const aff = (pp.affected_stakeholders || []) as string[]
             const quotes = (pp.source_quotes || []) as string[]
             return (
-              <div key={i} className={`border-2 rounded-2xl overflow-hidden ${getSevClass(sev)}`}>
+              <div key={i} className={`border-2 rounded-3xl overflow-hidden ${getSevClass(sev)}`}>
                 <div className="px-6 py-5">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2.5 mb-1">
-                        <span className="text-[12px] font-bold bg-white/60 text-slate-600 px-2 py-0.5 rounded-lg">{String(pp.id ?? `P${i + 1}`)}</span>
+                        <span className="text-[11px] font-semibold bg-white/70 text-slate-600 px-2 py-0.5 rounded-full">
+                          {String(pp.id ?? `P${i + 1}`)}
+                        </span>
                         <h3 className="text-[17px] font-extrabold text-slate-900">{String(pp.title ?? pp.pain_label ?? '')}</h3>
                       </div>
                       {notEmpty(pp.pain_category) && <p className="text-[13px] text-slate-500 font-medium">{String(pp.pain_category)}</p>}

@@ -20,6 +20,7 @@ from database import (
     get_transcript_sentences_for_meeting,
     get_last_meeting_id,
     update_meeting,
+    save_meeting,
 )
 from webhook import sync_meeting_to_mongodb
 
@@ -146,6 +147,24 @@ class MeetingUpdateRequest(BaseModel):
     title: str | None = None
 
 
+class MeetingImportRequest(BaseModel):
+    """
+    Import a meeting + transcript from JSON (manual upload).
+    This does NOT call MeetGeek; it just writes into Mongo so the UI and synthesis can use it.
+    """
+
+    meeting_id: str
+    title: str | None = None
+    transcript: str
+    transcript_sentences: list[dict] | None = None
+    participants: list[str] | None = None
+    source: str | None = "manual-upload"
+    host_email: str | None = None
+    language: str | None = None
+    date: str | None = None
+    duration_seconds: int | None = None
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -230,6 +249,39 @@ async def list_meetings(
         page_size=page_size,
         total_pages=total_pages,
     )
+
+
+@router.post("/meetings/import", response_model=MeetingDetail)
+async def import_meeting(
+    body: MeetingImportRequest,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
+    """
+    Import a meeting and transcript from JSON.
+
+    This is intended for manual uploads or non-MeetGeek sources.
+    If a meeting with the same meeting_id already exists, it will be updated.
+    """
+    meeting_data: dict = {
+        "meeting_id": body.meeting_id,
+        "title": body.title,
+        "transcript": body.transcript,
+        "transcript_sentences": body.transcript_sentences,
+        "participants": body.participants,
+        "source": body.source or "manual-upload",
+        "host_email": body.host_email,
+        "language": body.language,
+        # Store date and duration in the same fields used by MeetGeek imports
+        "date": body.date,
+        "duration": body.duration_seconds,
+        "processed": False,
+    }
+
+    await save_meeting(db, meeting_data)
+    stored = await get_meeting(db, body.meeting_id)
+    if not stored:
+        raise HTTPException(status_code=500, detail="Failed to import meeting")
+    return _meeting_to_detail(stored)
 
 
 @router.get("/meetings/all", response_model=MeetingListResponse)
@@ -497,6 +549,37 @@ async def delete_meeting_api(
     if not deleted:
         raise HTTPException(status_code=404, detail="Meeting not found")
     return None
+
+
+@router.delete("/meetings/{meeting_id}/transcript", response_model=MeetingDetail)
+async def clear_meeting_transcript(
+    meeting_id: str,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
+    """
+    Delete/clear transcript content for a meeting while keeping the meeting record.
+
+    This resets transcript fields and AI-derived fields so the meeting remains in history
+    but no longer carries transcript text.
+    """
+    meeting = await get_meeting(db, meeting_id)
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+
+    updated = await update_meeting(
+        db,
+        meeting_id,
+        {
+            "transcript": "",
+            "transcript_sentences": [],
+            "ai_analysis": None,
+            "ai_insights": None,
+            "processed": False,
+        },
+    )
+    if not updated:
+        raise HTTPException(status_code=500, detail="Failed to clear transcript")
+    return _meeting_to_detail(updated)
 
 
 @router.get("/dashboard", response_model=DashboardResponse)

@@ -1,18 +1,116 @@
 @import "tailwindcss";
 
+:root {
+  /* Core palette from ApexNeural design system */
+  --color-primary-light: #2563eb; /* blue primary */
+  --color-primary-dark: #1d4ed8;
+  --color-secondary-light: #f4f4f4;
+  --color-secondary-dark: #221e1c;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
+
+  /* Sidebar-specific blue accent */
+  --sidebar-accent: #2563eb;
+  --sidebar-accent-dark: #1d4ed8;
+  --sidebar-accent-soft: rgba(37, 99, 235, 0.08);
+
+  --bg-base: #f3f6ff;
+  --bg-elevated: #ffffff;
+  --bg-muted: #e5e7eb;
+  --text-main: var(--color-secondary-dark);
+  --text-subtle: rgba(34, 30, 28, 0.7);
+  --accent: var(--color-primary-light);
+  --accent-soft: rgba(37, 99, 235, 0.08);
+
+  /* Shadows / Depth */
+  --shadow-ambient-low: 0 10px 30px rgba(15, 23, 42, 0.06);
+  --shadow-ambient-high: 0 24px 80px rgba(15, 23, 42, 0.16);
+
+  /* Layout + spacing (4px scale) */
+  --container-max: 1280px;
+  --space-4: 4px;
+  --space-8: 8px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-24: 24px;
+  --space-32: 32px;
+  --space-48: 48px;
+  --space-64: 64px;
+}
+
 html {
   scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
-  background: #f1f5f9;
-  color: #1e293b;
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #f9fafb;
+  color: var(--text-main);
+  font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-size: 15px;
   line-height: 1.6;
+}
+
+/* App shell: flat light background */
+.app-shell {
+  min-height: 100vh;
+  background: #ffffff;
+}
+
+.card-elevated {
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-ambient-low);
+  border-radius: 20px;
+}
+
+.card-glass {
+  background: var(--glass-bg);
+  border-radius: 20px;
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(18px);
+  box-shadow: var(--shadow-ambient-low);
+}
+
+.hero-metric {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  letter-spacing: -0.04em;
+}
+
+/* Typography utilities aligned with design system */
+.ty-display {
+  font-family: 'Playfair Display', ui-serif, Georgia, 'Times New Roman', serif;
+  font-size: 72px;
+  line-height: 1.1;
+}
+
+.ty-h1 {
+  font-family: 'Playfair Display', ui-serif, Georgia, 'Times New Roman', serif;
+  font-size: 48px;
+  line-height: 1.2;
+}
+
+.ty-h2 {
+  font-family: 'Playfair Display', ui-serif, Georgia, 'Times New Roman', serif;
+  font-size: 36px;
+  line-height: 1.25;
+}
+
+.ty-h3 {
+  font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.ty-label {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 /* Scrollbar */

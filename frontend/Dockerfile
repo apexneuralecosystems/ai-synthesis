@@ -21,8 +21,7 @@ COPY . .
 # Inject backend API base URL for Vite at build time.
 ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
-RUN echo "Building frontend with VITE_API_BASE_URL='${VITE_API_BASE_URL:-/api}'" && \
-    npm run build
+RUN echo "Building frontend with VITE_API_BASE_URL='${VITE_API_BASE_URL}'" && npm run build
 
 # Stage 2: serve static files with Node (serve)
 FROM node:22-alpine
@@ -39,5 +38,5 @@ ENV FRONTEND_API_BASE_URL=${VITE_API_BASE_URL}
 
 EXPOSE 8022
 
-# Log which backend URL this image was built against, then start the static server.
-CMD ["sh", "-c", "echo \"Starting frontend on :8022 API base: ${FRONTEND_API_BASE_URL:-/api}\" >&2; serve -s dist -l 8022"]
+# Start the static server (logs will still show FRONTEND_API_BASE_URL via env if needed).
+CMD ["sh", "-c", "echo \"Starting frontend on :8022\" >&2; serve -s dist -l 8022"]

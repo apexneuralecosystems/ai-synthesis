@@ -19,9 +19,10 @@ RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 COPY . .
 
 # Inject backend API base URL for Vite at build time.
-ARG VITE_API_BASE_URL
+# Default to production backend so API calls go to backend.apexneurallabs.com even if build-arg is omitted.
+ARG VITE_API_BASE_URL=https://backend.apexneurallabs.com/api
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
-RUN echo "Building frontend with VITE_API_BASE_URL='${VITE_API_BASE_URL}'" && npm run build
+RUN echo "Building frontend with VITE_API_BASE_URL=${VITE_API_BASE_URL}" && npm run build
 
 # Stage 2: serve static files with Node (serve)
 FROM node:22-alpine

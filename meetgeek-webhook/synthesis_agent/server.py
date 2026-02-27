@@ -57,7 +57,7 @@ CORS_ORIGINS = (
         "http://localhost:8022",
         "http://127.0.0.1:8022",
         "http://localhost:5173",
-        "http://127.0.0.1:5173",
+        "https://synthesis.apexneurallabs.com/
     ]
 )
 CORS_ALLOW_WILDCARD = os.environ.get("CORS_ALLOW_WILDCARD", "").lower() in ("1", "true", "yes")

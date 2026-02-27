@@ -15,7 +15,8 @@ COPY requirements.txt .
 COPY synthesis_agent/requirements.txt synthesis_agent/
 RUN pip install --no-cache-dir -r requirements.txt -r synthesis_agent/requirements.txt
 
-# Copy application (synthesis engine + webhook + REST API + migrations)
+# Copy application (unified backend: main app + synthesis engine + webhook + REST API + migrations)
+COPY main.py ./
 COPY synthesis_agent/ synthesis_agent/
 COPY webhook.py config.py database.py api.py ./
 COPY migrations/ migrations/

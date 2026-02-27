@@ -284,7 +284,16 @@ async def get_meeting_detail(
     """Get full meeting details: title, date (IST), transcript, sentences, AI insights."""
     meeting = await get_meeting(db, meeting_id)
     if not meeting:
-        raise HTTPException(status_code=404, detail="Meeting not found")
+        # Auto-sync from MeetGeek API if meeting is not yet in DB
+        sync_result = await sync_meeting_to_mongodb(db, meeting_id)
+        if not sync_result.get("ok"):
+            raise HTTPException(
+                status_code=404,
+                detail=f"Meeting not found (and sync failed: {sync_result.get('error')})",
+            )
+        meeting = await get_meeting(db, meeting_id)
+        if not meeting:
+            raise HTTPException(status_code=404, detail="Meeting not found after sync")
     return _meeting_to_detail(meeting)
 
 
@@ -296,7 +305,19 @@ async def get_meeting_transcript(
     """Get plain-text transcript for a meeting."""
     meeting = await get_meeting(db, meeting_id)
     if not meeting:
-        raise HTTPException(status_code=404, detail="Meeting not found")
+        # Auto-sync from MeetGeek API if meeting is not yet in DB
+        sync_result = await sync_meetings_to_mongodb(
+            db=db,
+            body=SyncMeetingsRequest(meeting_ids=[meeting_id]),
+        )
+        if not any(r.get("ok") for r in sync_result.get("results", [])):
+            raise HTTPException(
+                status_code=404,
+                detail="Meeting not found and sync from MeetGeek API failed",
+            )
+        meeting = await get_meeting(db, meeting_id)
+        if not meeting:
+            raise HTTPException(status_code=404, detail="Meeting not found after sync")
     return {
         "meeting_id": meeting_id,
         "title": meeting.get("title"),
@@ -312,7 +333,19 @@ async def get_meeting_transcript_by_speakers(
     """Get transcript with speaker attribution: list of {speaker, text, timestamp}."""
     meeting = await get_meeting(db, meeting_id)
     if not meeting:
-        raise HTTPException(status_code=404, detail="Meeting not found")
+        # Auto-sync from MeetGeek API if meeting is not yet in DB
+        sync_result = await sync_meetings_to_mongodb(
+            db=db,
+            body=SyncMeetingsRequest(meeting_ids=[meeting_id]),
+        )
+        if not any(r.get("ok") for r in sync_result.get("results", [])):
+            raise HTTPException(
+                status_code=404,
+                detail="Meeting not found and sync from MeetGeek API failed",
+            )
+        meeting = await get_meeting(db, meeting_id)
+        if not meeting:
+            raise HTTPException(status_code=404, detail="Meeting not found after sync")
     sentences = await get_transcript_sentences_for_meeting(db, meeting_id)
     return {
         "meeting_id": meeting_id,

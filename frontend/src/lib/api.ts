@@ -9,6 +9,7 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
     const body = await res.json().catch(() => ({ detail: res.statusText }))
     throw new Error(body.detail || `HTTP ${res.status}`)
   }
+  if (res.status === 204) return undefined as T
   return res.json()
 }
 
@@ -16,13 +17,17 @@ export interface Meeting {
   meeting_id: string
   title: string
   date: string
-  date_end: string
+  date_end?: string
   duration: number
   participants: string[]
   source: string
   host_email: string
   language: string
   has_transcript: boolean
+  /** Backend list may return date_ist / date_iso instead of date */
+  date_ist?: string
+  date_iso?: string
+  duration_seconds?: number
 }
 
 export interface TranscriptSentence {
@@ -98,10 +103,16 @@ export interface MeetingImportPayload {
   duration_seconds?: number | null
 }
 
-/** Normalize /meetings: backend may return array or { meetings: array } */
+/** Normalize /meetings: backend returns { meetings, total, page, page_size, total_pages } */
 async function meetingsList(): Promise<Meeting[]> {
   const r = await req<Meeting[] | { meetings?: Meeting[] }>('/meetings')
   return Array.isArray(r) ? r : (r?.meetings ?? [])
+}
+
+/** Get all meetings (no pagination) for client-side search/filter. Backend max 5000. */
+async function meetingsAll(): Promise<Meeting[]> {
+  const r = await req<{ meetings?: Meeting[] }>('/meetings/all')
+  return r?.meetings ?? []
 }
 
 export const api = {
@@ -135,4 +146,12 @@ export const api = {
     req<MeetingDetail>(`/meetings/${meetingId}/transcript`, {
       method: 'DELETE',
     }),
+  deleteMeeting: (meetingId: string) =>
+    req<void>(`/meetings/${meetingId}`, { method: 'DELETE' }),
+  updateMeeting: (meetingId: string, body: { title?: string | null }) =>
+    req<MeetingDetail>(`/meetings/${meetingId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  meetingsAll,
 }

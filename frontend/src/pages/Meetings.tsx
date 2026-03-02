@@ -1,8 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 import type { Meeting, MeetingImportPayload } from '../lib/api'
-import { Search, Calendar, Clock, Users, ChevronRight, Inbox, Mic, Upload } from 'lucide-react'
+import { Search, Calendar, Clock, Users, ChevronRight, Inbox, Mic, Upload, Trash2, Filter } from 'lucide-react'
+
+/** Normalize date from list (backend may send date_ist/date_iso) */
+function getMeetingDate(m: Meeting): string {
+  return m.date || m.date_ist || m.date_iso || ''
+}
 
 function formatDate(d: string) {
   if (!d) return '—'
@@ -15,31 +20,69 @@ function formatTime(d: string) {
 }
 
 function formatDuration(secs: number) {
-  if (!secs) return '—'
+  if (secs == null) return '—'
   const m = Math.floor(secs / 60)
   const s = secs % 60
   return m > 0 ? `${m}m ${s}s` : `${s}s`
 }
 
+function parseDateInput(s: string): number | null {
+  if (!s) return null
+  const t = new Date(s).getTime()
+  return Number.isNaN(t) ? null : t
+}
+
 export default function Meetings() {
+  const navigate = useNavigate()
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [search, setSearch] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
-    api.meetings()
+    api.meetingsAll()
       .then(setMeetings)
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
 
-  const filtered = meetings.filter(m =>
-    m.title?.toLowerCase().includes(search.toLowerCase()) ||
-    m.host_email?.toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = meetings.filter(m => {
+    const q = search.toLowerCase()
+    const matchesSearch =
+      !q ||
+      m.title?.toLowerCase().includes(q) ||
+      m.host_email?.toLowerCase().includes(q) ||
+      m.meeting_id?.toLowerCase().includes(q) ||
+      (Array.isArray(m.participants) && m.participants.some((p: string) => p?.toLowerCase().includes(q)))
+    const rawDate = getMeetingDate(m)
+    const ts = rawDate ? new Date(rawDate).getTime() : null
+    const fromTs = parseDateInput(dateFrom)
+    const toTs = parseDateInput(dateTo)
+    const matchesFrom = !fromTs || (ts != null && ts >= fromTs)
+    const matchesTo = !toTs || (ts != null && ts <= toTs)
+    return matchesSearch && matchesFrom && matchesTo
+  })
+
+  async function handleDeleteMeeting(e: React.MouseEvent, meetingId: string) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!confirm('Delete this meeting permanently? This cannot be undone.')) return
+    setDeletingId(meetingId)
+    try {
+      await api.deleteMeeting(meetingId)
+      setMeetings(prev => prev.filter(m => m.meeting_id !== meetingId))
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete meeting'
+      setError(msg)
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]

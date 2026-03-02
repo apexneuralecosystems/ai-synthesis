@@ -5,6 +5,7 @@ No hardcoded secrets; all values loaded from .env or environment.
 import os
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -24,6 +25,12 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     # Optional: if set, public API (GET /meetings, /dashboard, etc.) requires this key via X-API-Key or Authorization: Bearer <key>
     public_api_key: str = ""
+
+    @field_validator("meetgeek_secret", mode="before")
+    @classmethod
+    def strip_meetgeek_secret(cls, v: str | None) -> str:
+        """Strip whitespace/newlines so env copy-paste does not break webhook verification."""
+        return (v or "").strip()
 
     class Config:
         env_file = ".env"

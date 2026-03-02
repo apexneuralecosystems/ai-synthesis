@@ -29,12 +29,14 @@ EVENT_SUMMARY_READY = "summary.ready"
 def verify_meetgeek_signature(payload_body: bytes, signature: str | None, secret: str) -> bool:
     """
     Verify MeetGeek webhook: HMAC SHA256 in plain hex, header x-mg-signature.
+    Secret and signature are stripped so env copy-paste (e.g. trailing newline) does not break verification.
     """
+    secret = (secret or "").strip()
     if not secret:
         return True
     if not signature:
         return False
-    # MeetGeek sends plain hex (no sha256= prefix)
+    # MeetGeek sends plain hex (optional sha256= prefix)
     sig = signature.strip()
     if sig.lower().startswith("sha256="):
         sig = sig[7:].strip()

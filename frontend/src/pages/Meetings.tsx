@@ -2,28 +2,50 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import type { Meeting, MeetingImportPayload, Folder } from '../lib/api'
-import { Search, Calendar, Clock, Users, ChevronRight, Inbox, Mic, Upload, Trash2, FolderPlus, FolderOpen, MoreVertical } from 'lucide-react'
+import { Search, Calendar, Clock, Users, ChevronRight, Inbox, Mic, Upload, Trash2, FolderPlus, FolderOpen, Folder as FolderIcon, MoreVertical, FolderMinus } from 'lucide-react'
 
 /** Normalize date from list (backend may send date_ist/date_iso) */
 function getMeetingDate(m: Meeting): string {
   return m.date || m.date_ist || m.date_iso || ''
 }
 
+/** Format for display: "Feb 26, 2025" */
 function formatDate(d: string) {
   if (!d) return '—'
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  const date = new Date(d)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+/** Format time: "10:30 AM" */
 function formatTime(d: string) {
   if (!d) return ''
-  return new Date(d).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+  const date = new Date(d)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
 }
 
+/** Relative label when useful: "Today", "Yesterday", or null */
+function formatDateRelative(d: string): string | null {
+  if (!d) return null
+  const date = new Date(d)
+  if (Number.isNaN(date.getTime())) return null
+  const today = new Date()
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+  if (date.toDateString() === today.toDateString()) return 'Today'
+  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday'
+  return null
+}
+
+/** Duration: "45 min" or "1h 30m" */
 function formatDuration(secs: number) {
   if (secs == null) return '—'
-  const m = Math.floor(secs / 60)
-  const s = secs % 60
-  return m > 0 ? `${m}m ${s}s` : `${s}s`
+  const totalMins = Math.floor(secs / 60)
+  const m = totalMins % 60
+  const h = Math.floor(totalMins / 60)
+  if (h > 0) return `${h}h ${m}m`
+  return m > 0 ? `${m} min` : `${secs % 60}s`
 }
 
 function parseDateInput(s: string): number | null {
@@ -198,10 +220,113 @@ export default function Meetings() {
     )
   }
 
+  function folderNameFor(meeting: Meeting): string {
+    if (!meeting.folder_id) return 'No folder'
+    const f = folders.find(x => x.id === meeting.folder_id)
+    return f?.name ?? 'Unknown'
+  }
+
+  // Sidebar counts: when viewing All we have full list; when viewing a folder we show count only for selected
+  const noFolderCount = selectedFolderId === null ? meetings.filter(m => !m.folder_id).length : 0
+  const folderCount = (fid: string) => selectedFolderId === null ? meetings.filter(m => m.folder_id === fid).length : 0
+
   return (
-    <div>
+    <div className="flex flex-col md:flex-row gap-6 lg:gap-8">
+      {/* Left sidebar: Folders - always first so it appears on the left when row layout */}
+      <aside className="md:w-52 lg:w-56 flex-shrink-0 order-first">
+        <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden md:sticky md:top-6">
+          <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50">
+            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+              <FolderOpen className="w-4 h-4 text-slate-400" />
+              Folders
+            </h2>
+          </div>
+          <nav className="p-2">
+            <button
+              type="button"
+              onClick={() => setSelectedFolderId(null)}
+              className={`w-full inline-flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+                selectedFolderId === null ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <span className="inline-flex items-center gap-2.5 min-w-0">
+                <FolderOpen className="w-4 h-4 flex-shrink-0" />
+                <span className="truncate">All meetings</span>
+              </span>
+              {selectedFolderId === null && <span className="flex-shrink-0 text-slate-400 tabular-nums">{meetings.length}</span>}
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedFolderId('')}
+              className={`w-full inline-flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+                selectedFolderId === '' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <span className="inline-flex items-center gap-2.5 min-w-0">
+                <FolderMinus className="w-4 h-4 flex-shrink-0" />
+                <span className="truncate">No folder</span>
+              </span>
+              {(selectedFolderId === '' || selectedFolderId === null) && <span className="flex-shrink-0 text-slate-400 tabular-nums">{selectedFolderId === '' ? meetings.length : noFolderCount}</span>}
+            </button>
+            {folders.length > 0 && (
+              <div className="mt-2 pt-2 border-t border-slate-100">
+                <p className="px-3 py-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wide">My folders</p>
+                {folders.map(f => (
+                  <div key={f.id} className="flex items-center group">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedFolderId(f.id)}
+                      className={`flex-1 min-w-0 inline-flex items-center justify-between gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors text-left ${
+                        selectedFolderId === f.id ? 'bg-amber-50 text-amber-800' : 'text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span className="inline-flex items-center gap-2.5 min-w-0 truncate">
+                        <FolderIcon className="w-4 h-4 flex-shrink-0 text-amber-500" />
+                        <span className="truncate">{f.name}</span>
+                      </span>
+                      {(selectedFolderId === f.id || selectedFolderId === null) && <span className="flex-shrink-0 text-slate-400 tabular-nums text-xs">{selectedFolderId === f.id ? meetings.length : folderCount(f.id)}</span>}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleDeleteFolder(f.id, e)}
+                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Delete folder"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </nav>
+          <div className="p-2 border-t border-slate-100 bg-slate-50/30">
+            <div className="flex gap-2 rounded-xl border border-dashed border-slate-200 bg-white px-2 py-2">
+              <input
+                type="text"
+                value={newFolderName}
+                onChange={e => setNewFolderName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleCreateFolder()}
+                placeholder="New folder..."
+                className="flex-1 min-w-0 text-sm border-0 bg-transparent focus:outline-none placeholder:text-slate-400"
+              />
+              <button
+                type="button"
+                onClick={handleCreateFolder}
+                disabled={!newFolderName.trim() || creatingFolder}
+                className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                title="Create folder"
+              >
+                <FolderPlus className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main: Header, Search, Stats, List */}
+      <div className="flex-1 min-w-0">
       {/* Page Header */}
-      <div className="mb-8 flex items-center justify-between gap-4">
+      <div className="mb-6 flex items-center justify-between gap-4">
         <div>
           <h1 className="text-[28px] font-extrabold text-slate-900 tracking-tight">Meetings</h1>
           <p className="text-[15px] text-slate-500 mt-1.5">All recorded meetings from your workspace</p>
@@ -218,73 +343,10 @@ export default function Meetings() {
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="inline-flex items-center gap-2 rounded-2xl bg-[var(--accent)] text-white text-[13px] font-medium px-4 py-2 shadow-sm hover:bg-[var(--color-primary-dark)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] text-white text-[13px] font-medium px-4 py-2.5 shadow-sm hover:bg-[var(--color-primary-dark)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
           >
             <Upload className="w-4 h-4" />
-            {uploading ? 'Uploading...' : 'Import JSON Meeting'}
-          </button>
-        </div>
-      </div>
-
-      {/* Folders */}
-      <div className="flex flex-wrap items-center gap-2 mb-6">
-        <button
-          type="button"
-          onClick={() => setSelectedFolderId(null)}
-          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
-            selectedFolderId === null ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          }`}
-        >
-          <FolderOpen className="w-4 h-4" />
-          All
-        </button>
-        <button
-          type="button"
-          onClick={() => setSelectedFolderId('')}
-          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
-            selectedFolderId === '' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          }`}
-        >
-          No folder
-        </button>
-        {folders.map(f => (
-          <div key={f.id} className="inline-flex items-center gap-1 rounded-xl bg-slate-100">
-            <button
-              type="button"
-              onClick={() => setSelectedFolderId(f.id)}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors rounded-l-xl ${
-                selectedFolderId === f.id ? 'bg-blue-100 text-blue-700' : 'text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              {f.name}
-            </button>
-            <button
-              type="button"
-              onClick={(e) => handleDeleteFolder(f.id, e)}
-              className="p-2 text-slate-400 hover:text-red-600 rounded-r-xl hover:bg-red-50"
-              title="Delete folder"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        ))}
-        <div className="inline-flex items-center gap-2 rounded-xl border border-dashed border-slate-300 px-3 py-2">
-          <input
-            type="text"
-            value={newFolderName}
-            onChange={e => setNewFolderName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleCreateFolder()}
-            placeholder="New folder name..."
-            className="w-36 text-sm border-0 bg-transparent focus:outline-none placeholder:text-slate-400"
-          />
-          <button
-            type="button"
-            onClick={handleCreateFolder}
-            disabled={!newFolderName.trim() || creatingFolder}
-            className="inline-flex items-center gap-1 rounded-lg bg-blue-600 text-white px-2.5 py-1.5 text-xs font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <FolderPlus className="w-3.5 h-3.5" />
-            {creatingFolder ? '…' : 'Add'}
+            {uploading ? 'Uploading...' : 'Import meeting'}
           </button>
         </div>
       </div>
@@ -297,12 +359,12 @@ export default function Meetings() {
           placeholder="Search by title or host email..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="w-full pl-11 pr-5 py-3 text-[15px] border border-slate-200 rounded-2xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400 transition-all placeholder:text-slate-400"
+          className="w-full pl-11 pr-5 py-3 text-[15px] border border-slate-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400 transition-all placeholder:text-slate-400"
         />
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-3 gap-4 mb-6">
         {[
           { label: 'Total Meetings', value: meetings.length, color: 'text-slate-800' },
           { label: 'With Transcript', value: meetings.filter(m => m.has_transcript).length, color: 'text-blue-600' },
@@ -342,26 +404,32 @@ export default function Meetings() {
                   <p className="text-[15px] font-bold text-slate-800 truncate group-hover:text-blue-700 transition-colors">
                     {m.title || 'Untitled Meeting'}
                   </p>
-                  <div className="flex items-center gap-4 mt-1.5 text-[13px] text-slate-400 font-medium">
-                    <span className="flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5" />
-                      {formatDate(getMeetingDate(m))}
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-[13px] text-slate-500">
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                      {formatDateRelative(getMeetingDate(m)) ?? formatDate(getMeetingDate(m))}
                     </span>
-                    <span className="flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5" />
-                      {formatTime(getMeetingDate(m))} &middot; {formatDuration(m.duration_seconds ?? m.duration)}
+                    <span className="flex items-center gap-1.5 text-slate-500">
+                      <Clock className="w-3.5 h-3.5 text-slate-400" />
+                      {formatTime(getMeetingDate(m))}
+                      {formatTime(getMeetingDate(m)) && ' · '}
+                      {formatDuration(m.duration_seconds ?? m.duration)}
                     </span>
                     {m.participants?.length > 0 && (
-                      <span className="flex items-center gap-1.5">
-                        <Users className="w-3.5 h-3.5" />
+                      <span className="flex items-center gap-1.5 text-slate-500">
+                        <Users className="w-3.5 h-3.5 text-slate-400" />
                         {m.participants.length} participants
                       </span>
                     )}
+                    <span className="flex items-center gap-1.5 text-slate-400">
+                      <FolderIcon className="w-3.5 h-3.5 text-amber-500" />
+                      <span className="text-[12px]">{folderNameFor(m)}</span>
+                    </span>
                   </div>
                 </div>
 
                 {/* Right badges */}
-                <div className="flex items-center gap-3 ml-4 flex-shrink-0">
+                <div className="flex items-center gap-2 ml-4 flex-shrink-0">
                   {m.source && (
                     <span className="bg-slate-100 text-slate-500 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wide">
                       {m.source}
@@ -369,7 +437,7 @@ export default function Meetings() {
                   )}
                   {m.has_transcript && (
                     <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg tracking-wide">
-                      TRANSCRIPT
+                      Transcript
                     </span>
                   )}
                   <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-blue-500 transition-colors" />
@@ -388,13 +456,14 @@ export default function Meetings() {
                     <MoreVertical className="w-4 h-4" />
                   </button>
                   {openMoveId === m.meeting_id && (
-                    <div className="absolute right-0 top-full mt-1 z-20 min-w-[180px] py-1 bg-white border border-slate-200 rounded-xl shadow-lg">
-                      <p className="px-3 py-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wide">Move to</p>
+                    <div className="absolute right-0 top-full mt-1 z-20 min-w-[200px] py-1 bg-white border border-slate-200 rounded-xl shadow-lg">
+                      <p className="px-3 py-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wide">Move to folder</p>
                       <button
                         type="button"
                         onClick={() => handleMoveToFolder(m.meeting_id, null)}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+                        className="w-full text-left inline-flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg mx-1"
                       >
+                        <FolderMinus className="w-4 h-4 text-slate-400" />
                         No folder
                       </button>
                       {folders.map(f => (
@@ -402,8 +471,9 @@ export default function Meetings() {
                           key={f.id}
                           type="button"
                           onClick={() => handleMoveToFolder(m.meeting_id, f.id)}
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+                          className="w-full text-left inline-flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg mx-1"
                         >
+                          <FolderIcon className="w-4 h-4 text-amber-500" />
                           {f.name}
                         </button>
                       ))}
@@ -433,6 +503,7 @@ export default function Meetings() {
           ))}
         </div>
       )}
+      </div>
     </div>
   )
 }

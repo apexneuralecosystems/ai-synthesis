@@ -21,6 +21,10 @@ from database import (
     get_last_meeting_id,
     update_meeting,
     save_meeting,
+    create_folder,
+    list_folders,
+    get_folder,
+    delete_folder,
 )
 from webhook import sync_meeting_to_mongodb
 
@@ -85,6 +89,7 @@ class MeetingItem(BaseModel):
     transcript_preview: str | None = None
     ai_processed: bool = False
     created_at_ist: str | None = None
+    folder_id: str | None = None
 
 
 class MeetingDetail(BaseModel):
@@ -114,6 +119,7 @@ class MeetingDetail(BaseModel):
     ai_insights: dict | None = None
     created_at_ist: str | None = None
     updated_at_ist: str | None = None
+    folder_id: str | None = None
 
 
 class MeetingListResponse(BaseModel):
@@ -145,6 +151,22 @@ class AIAnalyzeResponse(BaseModel):
 class MeetingUpdateRequest(BaseModel):
     """Fields a user can manually update on a meeting."""
     title: str | None = None
+    folder_id: str | None = None
+
+
+class FolderItem(BaseModel):
+    """A folder for grouping meetings."""
+    id: str
+    name: str
+    created_at_ist: str | None = None
+
+
+class FolderListResponse(BaseModel):
+    folders: list[FolderItem]
+
+
+class FolderCreateRequest(BaseModel):
+    name: str
 
 
 class MeetingImportRequest(BaseModel):
@@ -196,6 +218,7 @@ def _meeting_to_item(m: dict) -> MeetingItem:
         transcript_preview=preview,
         ai_processed=m.get("processed", False),
         created_at_ist=_to_ist(m.get("created_at")),
+        folder_id=m.get("folder_id"),
     )
 
 
@@ -224,6 +247,7 @@ def _meeting_to_detail(m: dict) -> MeetingDetail:
         ai_insights=m.get("ai_insights"),
         created_at_ist=_to_ist(m.get("created_at")),
         updated_at_ist=_to_ist(m.get("updated_at")),
+        folder_id=m.get("folder_id"),
     )
 
 
@@ -235,12 +259,13 @@ def _meeting_to_detail(m: dict) -> MeetingDetail:
 async def list_meetings(
     page: int = Query(1, ge=1, description="Page number (1-based)"),
     page_size: int = Query(20, ge=1, le=100, description="Results per page"),
+    folder_id: str | None = Query(None, description="Filter by folder id; empty string = no folder"),
     db: AsyncIOMotorDatabase = Depends(get_db),
 ):
     """List all meetings with name, date (IST), duration, transcript preview, AI status."""
     skip = (page - 1) * page_size
-    total = await count_meetings(db)
-    meetings = await get_all_meetings(db, skip=skip, limit=page_size)
+    total = await count_meetings(db, folder_id=folder_id)
+    meetings = await get_all_meetings(db, skip=skip, limit=page_size, folder_id=folder_id)
     total_pages = max(1, (total + page_size - 1) // page_size)
     return MeetingListResponse(
         meetings=[_meeting_to_item(m) for m in meetings],
@@ -286,11 +311,12 @@ async def import_meeting(
 
 @router.get("/meetings/all", response_model=MeetingListResponse)
 async def list_all_meetings(
+    folder_id: str | None = Query(None, description="Filter by folder id; empty string = no folder"),
     db: AsyncIOMotorDatabase = Depends(get_db),
 ):
     """Get all meetings (no pagination, max 5000)."""
-    total = await count_meetings(db)
-    meetings = await get_all_meetings(db, skip=0, limit=5000)
+    total = await count_meetings(db, folder_id=folder_id)
+    meetings = await get_all_meetings(db, skip=0, limit=5000, folder_id=folder_id)
     return MeetingListResponse(
         meetings=[_meeting_to_item(m) for m in meetings],
         total=total,
@@ -594,3 +620,44 @@ async def dashboard(
         total_ai_processed=stats["meetings_processed_by_ai"],
         latest_meetings=[_meeting_to_item(m) for m in stats["latest_meetings"]],
     )
+
+
+# ---------------------------------------------------------------------------
+# Folders
+# ---------------------------------------------------------------------------
+
+def _folder_to_item(f: dict) -> FolderItem:
+    return FolderItem(
+        id=f["id"],
+        name=f["name"],
+        created_at_ist=_to_ist(f.get("created_at")),
+    )
+
+
+@router.get("/folders", response_model=FolderListResponse)
+async def list_folders_api(db: AsyncIOMotorDatabase = Depends(get_db)):
+    """List all folders."""
+    folders = await list_folders(db)
+    return FolderListResponse(folders=[_folder_to_item(f) for f in folders])
+
+
+@router.post("/folders", response_model=FolderItem)
+async def create_folder_api(
+    body: FolderCreateRequest,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
+    """Create a new folder."""
+    folder = await create_folder(db, body.name)
+    return _folder_to_item(folder)
+
+
+@router.delete("/folders/{folder_id}", status_code=204)
+async def delete_folder_api(
+    folder_id: str,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
+    """Delete a folder and move its meetings to no folder."""
+    deleted = await delete_folder(db, folder_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Folder not found")
+    return None

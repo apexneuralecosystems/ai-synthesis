@@ -128,6 +128,7 @@ async def save_meeting(db: AsyncIOMotorDatabase, meeting_data: dict[str, Any]) -
         "transcript", "transcript_sentences", "summary", "highlights",
         "action_items", "ai_analysis", "ai_insights",
         "source", "event_id", "host_email", "join_link", "language",
+        "folder_id",
     }
     if existing:
         update = {k: meeting_data[k] for k in meeting_fields if k in meeting_data}
@@ -155,8 +156,9 @@ async def update_meeting(
         "transcript", "transcript_sentences", "summary", "highlights",
         "action_items", "ai_analysis", "ai_insights", "processed",
         "source", "event_id", "host_email", "join_link", "language",
+        "folder_id",
     }
-    update = {k: v for k, v in data.items() if k in allowed and v is not None}
+    update = {k: v for k, v in data.items() if k in allowed}
     if not update:
         return await get_meeting(db, meeting_id)
     update["updated_at"] = _now()
@@ -183,15 +185,26 @@ async def get_meeting_by_uuid(
     return _doc_to_meeting(doc) if doc else None
 
 
+def _folder_filter(folder_id: str | None) -> dict[str, Any]:
+    """Build query filter for folder_id. None = no filter, '' = no folder (unset/empty)."""
+    if folder_id is None:
+        return {}
+    if folder_id == "":
+        return {"$or": [{"folder_id": {"$exists": False}}, {"folder_id": None}, {"folder_id": ""}]}
+    return {"folder_id": folder_id}
+
+
 async def get_all_meetings(
     db: AsyncIOMotorDatabase,
     skip: int = 0,
     limit: int = 50,
+    folder_id: str | None = None,
 ) -> list[dict[str, Any]]:
-    """List meetings with pagination, ordered by created_at desc."""
+    """List meetings with pagination, ordered by created_at desc. Optional folder_id filter."""
+    query = _folder_filter(folder_id)
     cursor = (
         db["meetings"]
-        .find({})
+        .find(query)
         .sort("created_at", -1)
         .skip(skip)
         .limit(limit)
@@ -202,14 +215,18 @@ async def get_all_meetings(
     return out
 
 
-async def count_meetings(db: AsyncIOMotorDatabase, query: str | None = None) -> int:
-    """Count total meetings, optionally filtered by search query."""
+async def count_meetings(
+    db: AsyncIOMotorDatabase,
+    query: str | None = None,
+    folder_id: str | None = None,
+) -> int:
+    """Count total meetings, optionally filtered by search query and/or folder_id."""
+    q: dict[str, Any] = _folder_filter(folder_id)
     if query:
         pattern = {"$regex": query, "$options": "i"}
-        return await db["meetings"].count_documents(
-            {"$or": [{"transcript": pattern}, {"title": pattern}]}
-        )
-    return await db["meetings"].count_documents({})
+        search_clause = {"$or": [{"transcript": pattern}, {"title": pattern}]}
+        q = {"$and": [q, search_clause]} if q else search_clause
+    return await db["meetings"].count_documents(q)
 
 
 async def search_meetings(
@@ -236,6 +253,43 @@ async def search_meetings(
 async def delete_meeting(db: AsyncIOMotorDatabase, meeting_id: str) -> bool:
     """Delete a meeting by meeting_id. Returns True if deleted."""
     result = await db["meetings"].delete_one({"meeting_id": meeting_id})
+    return result.deleted_count > 0
+
+
+# --- Folders ---
+
+
+async def create_folder(db: AsyncIOMotorDatabase, name: str) -> dict[str, Any]:
+    """Create a folder. Returns folder dict with id, name, created_at."""
+    fid = str(uuid4())
+    now = _now()
+    doc = {"id": fid, "name": (name or "").strip() or "Unnamed", "created_at": now}
+    await db["folders"].insert_one(doc)
+    return {"id": doc["id"], "name": doc["name"], "created_at": doc["created_at"]}
+
+
+async def list_folders(db: AsyncIOMotorDatabase) -> list[dict[str, Any]]:
+    """List all folders sorted by name."""
+    cursor = db["folders"].find({}).sort("name", 1)
+    out = []
+    async for doc in cursor:
+        out.append({"id": doc["id"], "name": doc["name"], "created_at": doc.get("created_at")})
+    return out
+
+
+async def get_folder(db: AsyncIOMotorDatabase, folder_id: str) -> dict[str, Any] | None:
+    """Get a folder by id."""
+    doc = await db["folders"].find_one({"id": folder_id})
+    if not doc:
+        return None
+    return {"id": doc["id"], "name": doc["name"], "created_at": doc.get("created_at")}
+
+
+async def delete_folder(db: AsyncIOMotorDatabase, folder_id: str) -> bool:
+    """Delete a folder and clear folder_id on all meetings in that folder. Returns True if deleted."""
+    result = await db["folders"].delete_one({"id": folder_id})
+    if result.deleted_count > 0:
+        await db["meetings"].update_many({"folder_id": folder_id}, {"$set": {"folder_id": None}})
     return result.deleted_count > 0
 
 

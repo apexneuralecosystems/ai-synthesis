@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 import type { MeetingDetail as MD, TranscriptSentence, ChatMessage } from '../lib/api'
 import {
@@ -15,6 +15,7 @@ import {
   ChevronDown,
   Bot,
   Send,
+  Trash2,
 } from 'lucide-react'
 
 const SPEAKER_COLORS = [
@@ -54,6 +55,7 @@ function getInitials(name: string) {
 
 export default function MeetingDetail() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const [meeting, setMeeting] = useState<MD | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -65,6 +67,7 @@ export default function MeetingDetail() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [chatLoading, setChatLoading] = useState(false)
   const [clearingTranscript, setClearingTranscript] = useState(false)
+  const [deletingMeeting, setDeletingMeeting] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -91,6 +94,22 @@ export default function MeetingDetail() {
       alert(msg)
     } finally {
       setClearingTranscript(false)
+    }
+  }
+
+  async function handlePermanentDelete() {
+    if (!id || !meeting || deletingMeeting) return
+    const ok = window.confirm('Permanently delete this meeting? This cannot be undone.')
+    if (!ok) return
+    setDeletingMeeting(true)
+    try {
+      await api.deleteMeeting(id)
+      navigate('/meetings')
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to delete meeting'
+      alert(msg)
+    } finally {
+      setDeletingMeeting(false)
     }
   }
 
@@ -330,6 +349,23 @@ export default function MeetingDetail() {
             <ChevronUp className="w-5 h-5" />
           </button>
         )}
+      </div>
+
+      {/* Danger zone: permanently delete meeting */}
+      <div className="mt-8 p-6 bg-white border border-red-200/80 rounded-2xl">
+        <p className="text-[11px] font-bold text-red-600 uppercase tracking-widest mb-2">Danger zone</p>
+        <p className="text-[13px] text-slate-600 mb-3">
+          Permanently remove this meeting and all its data. This cannot be undone.
+        </p>
+        <button
+          type="button"
+          onClick={handlePermanentDelete}
+          disabled={deletingMeeting}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-red-300 text-red-600 text-sm font-semibold hover:bg-red-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+        >
+          <Trash2 className="w-4 h-4" />
+          {deletingMeeting ? 'Deleting...' : 'Permanently delete meeting'}
+        </button>
       </div>
 
       {/* Chat with this meeting */}

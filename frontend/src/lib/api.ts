@@ -28,6 +28,13 @@ export interface Meeting {
   date_ist?: string
   date_iso?: string
   duration_seconds?: number
+  folder_id?: string | null
+}
+
+export interface Folder {
+  id: string
+  name: string
+  created_at_ist?: string | null
 }
 
 export interface TranscriptSentence {
@@ -109,10 +116,24 @@ async function meetingsList(): Promise<Meeting[]> {
   return Array.isArray(r) ? r : (r?.meetings ?? [])
 }
 
-/** Get all meetings (no pagination) for client-side search/filter. Backend max 5000. */
-async function meetingsAll(): Promise<Meeting[]> {
-  const r = await req<{ meetings?: Meeting[] }>('/meetings/all')
+/** Get all meetings (no pagination) for client-side search/filter. Backend max 5000. Optional folder_id: '' = no folder. */
+async function meetingsAll(folderId?: string | null): Promise<Meeting[]> {
+  const params = folderId !== undefined && folderId !== null ? `?folder_id=${encodeURIComponent(folderId)}` : ''
+  const r = await req<{ meetings?: Meeting[] }>(`/meetings/all${params}`)
   return r?.meetings ?? []
+}
+
+async function foldersList(): Promise<Folder[]> {
+  const r = await req<{ folders?: Folder[] }>('/folders')
+  return r?.folders ?? []
+}
+
+function folderCreate(name: string) {
+  return req<Folder>('/folders', { method: 'POST', body: JSON.stringify({ name }) })
+}
+
+function folderDelete(folderId: string) {
+  return req<void>(`/folders/${folderId}`, { method: 'DELETE' })
 }
 
 export const api = {
@@ -148,10 +169,13 @@ export const api = {
     }),
   deleteMeeting: (meetingId: string) =>
     req<void>(`/meetings/${meetingId}`, { method: 'DELETE' }),
-  updateMeeting: (meetingId: string, body: { title?: string | null }) =>
+  updateMeeting: (meetingId: string, body: { title?: string | null; folder_id?: string | null }) =>
     req<MeetingDetail>(`/meetings/${meetingId}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
     }),
   meetingsAll,
+  foldersList,
+  folderCreate,
+  folderDelete,
 }

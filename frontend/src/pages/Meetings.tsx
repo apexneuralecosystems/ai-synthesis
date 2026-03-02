@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
-import type { Meeting, MeetingImportPayload } from '../lib/api'
-import { Search, Calendar, Clock, Users, ChevronRight, Inbox, Mic, Upload, Trash2, Filter } from 'lucide-react'
+import type { Meeting, MeetingImportPayload, Folder } from '../lib/api'
+import { Search, Calendar, Clock, Users, ChevronRight, Inbox, Mic, Upload, Trash2, FolderPlus, FolderOpen, MoreVertical } from 'lucide-react'
 
 /** Normalize date from list (backend may send date_ist/date_iso) */
 function getMeetingDate(m: Meeting): string {
@@ -32,9 +32,11 @@ function parseDateInput(s: string): number | null {
   return Number.isNaN(t) ? null : t
 }
 
+/** selectedFolderId: null = All, '' = No folder, string = folder id */
 export default function Meetings() {
-  const navigate = useNavigate()
   const [meetings, setMeetings] = useState<Meeting[]>([])
+  const [folders, setFolders] = useState<Folder[]>([])
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -42,14 +44,27 @@ export default function Meetings() {
   const [error, setError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [movingId, setMovingId] = useState<string | null>(null)
+  const [newFolderName, setNewFolderName] = useState('')
+  const [creatingFolder, setCreatingFolder] = useState(false)
+  const [openMoveId, setOpenMoveId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
+  function loadFolders() {
+    api.foldersList().then(setFolders).catch(() => setFolders([]))
+  }
+
   useEffect(() => {
-    api.meetingsAll()
+    loadFolders()
+  }, [])
+
+  useEffect(() => {
+    setLoading(true)
+    api.meetingsAll(selectedFolderId ?? undefined)
       .then(setMeetings)
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
-  }, [])
+  }, [selectedFolderId])
 
   const filtered = meetings.filter(m => {
     const q = search.toLowerCase()
@@ -81,6 +96,55 @@ export default function Meetings() {
       setError(msg)
     } finally {
       setDeletingId(null)
+    }
+  }
+
+  async function handleMoveToFolder(meetingId: string, folderId: string | null) {
+    setOpenMoveId(null)
+    setMovingId(meetingId)
+    try {
+      await api.updateMeeting(meetingId, { folder_id: folderId ?? null })
+      setMeetings(prev => prev.map(m => m.meeting_id === meetingId ? { ...m, folder_id: folderId ?? undefined } : m))
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to move meeting'
+      setError(msg)
+    } finally {
+      setMovingId(null)
+    }
+  }
+
+  async function handleCreateFolder() {
+    const name = newFolderName.trim()
+    if (!name) return
+    setCreatingFolder(true)
+    try {
+      const folder = await api.folderCreate(name)
+      setFolders(prev => [...prev, folder])
+      setNewFolderName('')
+      setSelectedFolderId(folder.id)
+      api.meetingsAll(folder.id).then(setMeetings)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to create folder'
+      setError(msg)
+    } finally {
+      setCreatingFolder(false)
+    }
+  }
+
+  async function handleDeleteFolder(folderId: string, e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!confirm('Delete this folder? Meetings inside will be moved to "No folder".')) return
+    try {
+      await api.folderDelete(folderId)
+      setFolders(prev => prev.filter(f => f.id !== folderId))
+      if (selectedFolderId === folderId) {
+        setSelectedFolderId(null)
+        api.meetingsAll().then(setMeetings)
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete folder'
+      setError(msg)
     }
   }
 
@@ -125,7 +189,7 @@ export default function Meetings() {
         <p className="text-sm text-slate-500 max-w-md text-center">{error}</p>
         <button
           type="button"
-          onClick={() => { setError(null); setLoading(true); api.meetings().then(setMeetings).catch((e: Error) => setError(e.message)).finally(() => setLoading(false)) }}
+          onClick={() => { setError(null); setLoading(true); api.meetingsAll(selectedFolderId ?? undefined).then(setMeetings).catch((e: Error) => setError(e.message)).finally(() => setLoading(false)) }}
           className="mt-2 px-4 py-2 rounded-lg bg-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-300"
         >
           Retry
@@ -158,6 +222,69 @@ export default function Meetings() {
           >
             <Upload className="w-4 h-4" />
             {uploading ? 'Uploading...' : 'Import JSON Meeting'}
+          </button>
+        </div>
+      </div>
+
+      {/* Folders */}
+      <div className="flex flex-wrap items-center gap-2 mb-6">
+        <button
+          type="button"
+          onClick={() => setSelectedFolderId(null)}
+          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
+            selectedFolderId === null ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          <FolderOpen className="w-4 h-4" />
+          All
+        </button>
+        <button
+          type="button"
+          onClick={() => setSelectedFolderId('')}
+          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
+            selectedFolderId === '' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          No folder
+        </button>
+        {folders.map(f => (
+          <div key={f.id} className="inline-flex items-center gap-1 rounded-xl bg-slate-100">
+            <button
+              type="button"
+              onClick={() => setSelectedFolderId(f.id)}
+              className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors rounded-l-xl ${
+                selectedFolderId === f.id ? 'bg-blue-100 text-blue-700' : 'text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {f.name}
+            </button>
+            <button
+              type="button"
+              onClick={(e) => handleDeleteFolder(f.id, e)}
+              className="p-2 text-slate-400 hover:text-red-600 rounded-r-xl hover:bg-red-50"
+              title="Delete folder"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ))}
+        <div className="inline-flex items-center gap-2 rounded-xl border border-dashed border-slate-300 px-3 py-2">
+          <input
+            type="text"
+            value={newFolderName}
+            onChange={e => setNewFolderName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleCreateFolder()}
+            placeholder="New folder name..."
+            className="w-36 text-sm border-0 bg-transparent focus:outline-none placeholder:text-slate-400"
+          />
+          <button
+            type="button"
+            onClick={handleCreateFolder}
+            disabled={!newFolderName.trim() || creatingFolder}
+            className="inline-flex items-center gap-1 rounded-lg bg-blue-600 text-white px-2.5 py-1.5 text-xs font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <FolderPlus className="w-3.5 h-3.5" />
+            {creatingFolder ? '…' : 'Add'}
           </button>
         </div>
       </div>
@@ -198,56 +325,111 @@ export default function Meetings() {
       ) : (
         <div className="space-y-2.5">
           {filtered.map(m => (
-            <Link
+            <div
               key={m.meeting_id}
-              to={`/meeting/${m.meeting_id}`}
               className="flex items-center bg-white border border-slate-200/80 rounded-2xl px-5 py-4 hover:border-blue-300 hover:shadow-md hover:shadow-blue-50 transition-all duration-150 group"
             >
-              {/* Icon */}
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 mr-4 ${
-                m.has_transcript ? 'bg-blue-50' : 'bg-slate-100'
-              }`}>
-                <Mic className={`w-[18px] h-[18px] ${m.has_transcript ? 'text-blue-500' : 'text-slate-400'}`} />
-              </div>
+              <Link to={`/meeting/${m.meeting_id}`} className="flex flex-1 min-w-0 items-center">
+                {/* Icon */}
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 mr-4 ${
+                  m.has_transcript ? 'bg-blue-50' : 'bg-slate-100'
+                }`}>
+                  <Mic className={`w-[18px] h-[18px] ${m.has_transcript ? 'text-blue-500' : 'text-slate-400'}`} />
+                </div>
 
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <p className="text-[15px] font-bold text-slate-800 truncate group-hover:text-blue-700 transition-colors">
-                  {m.title || 'Untitled Meeting'}
-                </p>
-                <div className="flex items-center gap-4 mt-1.5 text-[13px] text-slate-400 font-medium">
-                  <span className="flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5" />
-                    {formatDate(m.date)}
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5" />
-                    {formatTime(m.date)} &middot; {formatDuration(m.duration)}
-                  </span>
-                  {m.participants?.length > 0 && (
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-[15px] font-bold text-slate-800 truncate group-hover:text-blue-700 transition-colors">
+                    {m.title || 'Untitled Meeting'}
+                  </p>
+                  <div className="flex items-center gap-4 mt-1.5 text-[13px] text-slate-400 font-medium">
                     <span className="flex items-center gap-1.5">
-                      <Users className="w-3.5 h-3.5" />
-                      {m.participants.length} participants
+                      <Calendar className="w-3.5 h-3.5" />
+                      {formatDate(getMeetingDate(m))}
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5" />
+                      {formatTime(getMeetingDate(m))} &middot; {formatDuration(m.duration_seconds ?? m.duration)}
+                    </span>
+                    {m.participants?.length > 0 && (
+                      <span className="flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5" />
+                        {m.participants.length} participants
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right badges */}
+                <div className="flex items-center gap-3 ml-4 flex-shrink-0">
+                  {m.source && (
+                    <span className="bg-slate-100 text-slate-500 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wide">
+                      {m.source}
                     </span>
                   )}
+                  {m.has_transcript && (
+                    <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg tracking-wide">
+                      TRANSCRIPT
+                    </span>
+                  )}
+                  <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-blue-500 transition-colors" />
                 </div>
-              </div>
+              </Link>
 
-              {/* Right badges */}
-              <div className="flex items-center gap-3 ml-4 flex-shrink-0">
-                {m.source && (
-                  <span className="bg-slate-100 text-slate-500 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wide">
-                    {m.source}
-                  </span>
-                )}
-                {m.has_transcript && (
-                  <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg tracking-wide">
-                    TRANSCRIPT
-                  </span>
-                )}
-                <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-blue-500 transition-colors" />
+              {/* Move & Delete */}
+              <div className="flex items-center gap-1 ml-2 flex-shrink-0" onClick={e => e.preventDefault()}>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); setOpenMoveId(openMoveId === m.meeting_id ? null : m.meeting_id) }}
+                    className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                    title="Move to folder"
+                  >
+                    <MoreVertical className="w-4 h-4" />
+                  </button>
+                  {openMoveId === m.meeting_id && (
+                    <div className="absolute right-0 top-full mt-1 z-20 min-w-[180px] py-1 bg-white border border-slate-200 rounded-xl shadow-lg">
+                      <p className="px-3 py-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wide">Move to</p>
+                      <button
+                        type="button"
+                        onClick={() => handleMoveToFolder(m.meeting_id, null)}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+                      >
+                        No folder
+                      </button>
+                      {folders.map(f => (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => handleMoveToFolder(m.meeting_id, f.id)}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+                        >
+                          {f.name}
+                        </button>
+                      ))}
+                      <div className="border-t border-slate-100 my-1" />
+                      <button
+                        type="button"
+                        onClick={(e) => { handleDeleteMeeting(e, m.meeting_id); setOpenMoveId(null) }}
+                        disabled={deletingId === m.meeting_id}
+                        className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 font-medium"
+                      >
+                        Permanently delete meeting
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => handleDeleteMeeting(e, m.meeting_id)}
+                  disabled={deletingId === m.meeting_id}
+                  className="p-2 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                  title="Permanently delete meeting"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
-            </Link>
+            </div>
           ))}
         </div>
       )}

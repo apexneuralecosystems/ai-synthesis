@@ -90,15 +90,17 @@ export default function MeetingSynthesize() {
             <p className="text-sm text-[var(--slate-600)]">
               Report: <span className="font-mono text-[var(--blue-700)]">report_{result.call_id}.json</span>
             </p>
-            <p className="text-xs text-[var(--slate-500)] mt-1">
-              {result.usage.model} · {result.usage.input_tokens} in / {result.usage.output_tokens} out · {result.usage.elapsed_seconds}s
-            </p>
+            {result.usage && (
+              <p className="text-xs text-[var(--slate-500)] mt-1">
+                {result.usage.model} · {result.usage.input_tokens} in / {result.usage.output_tokens} out · {result.usage.elapsed_seconds}s
+              </p>
+            )}
           </div>
 
-          {result.quote_check.length > 0 && (
+          {(result.quote_check?.length ?? 0) > 0 && (
             <div className="p-4 rounded-xl bg-white border border-[var(--slate-200)] mb-6">
               <h4 className="text-xs font-semibold text-[var(--slate-500)] uppercase tracking-wider mb-2">Quote Spot Check</h4>
-              {result.quote_check.map((q: { quote: string; found: boolean }, i: number) => (
+              {result.quote_check?.map((q: { quote: string; found: boolean }, i: number) => (
                 <div key={i} className="flex items-center gap-2 text-xs py-1">
                   <span className={q.found ? 'text-green-600' : 'text-red-500'}>{q.found ? '✓' : '✗'}</span>
                   <span className="text-[var(--slate-600)] truncate">{q.quote}</span>

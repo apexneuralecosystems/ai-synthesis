@@ -28,6 +28,9 @@ from database import (
     list_folders,
     get_folder,
     delete_folder,
+    soft_delete_folder,
+    restore_folder,
+    list_trashed_folders,
 )
 from webhook import sync_meeting_to_mongodb
 
@@ -678,8 +681,15 @@ def _folder_to_item(f: dict) -> FolderItem:
 
 @router.get("/folders", response_model=FolderListResponse)
 async def list_folders_api(db: AsyncIOMotorDatabase = Depends(get_db)):
-    """List all folders."""
+    """List all non-trashed folders."""
     folders = await list_folders(db)
+    return FolderListResponse(folders=[_folder_to_item(f) for f in folders])
+
+
+@router.get("/folders/trash", response_model=FolderListResponse)
+async def list_folders_trash(db: AsyncIOMotorDatabase = Depends(get_db)):
+    """List folders in bin (soft-deleted)."""
+    folders = await list_trashed_folders(db, skip=0, limit=500)
     return FolderListResponse(folders=[_folder_to_item(f) for f in folders])
 
 
@@ -698,7 +708,31 @@ async def delete_folder_api(
     folder_id: str,
     db: AsyncIOMotorDatabase = Depends(get_db),
 ):
-    """Delete a folder and move its meetings to no folder."""
+    """Move folder to bin (soft delete). Meetings keep their folder_id. Use DELETE /folders/{id}/permanent to remove permanently."""
+    updated = await soft_delete_folder(db, folder_id)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Folder not found")
+    return None
+
+
+@router.post("/folders/{folder_id}/restore", status_code=200)
+async def restore_folder_api(
+    folder_id: str,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
+    """Restore a folder from bin."""
+    updated = await restore_folder(db, folder_id)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Folder not found or not in bin")
+    return {"status": "restored", "folder_id": folder_id}
+
+
+@router.delete("/folders/{folder_id}/permanent", status_code=204)
+async def permanent_delete_folder_api(
+    folder_id: str,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
+    """Permanently delete a folder and move its meetings to no folder."""
     deleted = await delete_folder(db, folder_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Folder not found")

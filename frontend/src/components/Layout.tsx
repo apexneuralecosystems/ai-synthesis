@@ -16,7 +16,6 @@ export default function Layout({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
   const [open, setOpen] = useState(true)
   const ctx = useMeetings()
-  const isMeetings = pathname === '/' || pathname.startsWith('/meeting/')
   const [newFolderName, setNewFolderName] = useState('')
   const [creatingFolder, setCreatingFolder] = useState(false)
   const [folderSearch, setFolderSearch] = useState('')
@@ -41,7 +40,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   async function handleDeleteFolder(e: React.MouseEvent, id: string) {
     e.preventDefault()
     e.stopPropagation()
-    if (!ctx || !window.confirm('Delete this folder? Meetings inside will be moved to "No folder".')) return
+    if (!ctx || !window.confirm('Move this folder to Bin? Meetings stay linked. Restore or permanently delete from Bin.')) return
     try {
       await ctx.deleteFolder(id)
     } catch {}
@@ -68,14 +67,14 @@ export default function Layout({ children }: { children: ReactNode }) {
           )}
         </div>
 
-        {/* Folders: only when on Meetings and sidebar open - placed high, right under logo */}
-        {open && isMeetings && ctx && (
-          <div className="px-3 pt-2 pb-2 border-b border-slate-100/80 flex flex-col gap-2 flex-shrink-0">
-            <p className="px-2 pb-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+        {/* Folders: always visible when sidebar open, ~half of sidebar with scroll; folder rows with different colors */}
+        {open && ctx && (
+          <div className="px-3 pt-2 pb-2 border-b border-slate-100/80 flex flex-col gap-2 flex-1 min-h-0 flex-shrink overflow-hidden">
+            <p className="px-2 pb-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 flex-shrink-0">
               <FolderOpen className="w-3.5 h-3.5" />
               Folders
             </p>
-            <div className="relative">
+            <div className="relative flex-shrink-0">
               <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input
                 type="text"
@@ -85,12 +84,12 @@ export default function Layout({ children }: { children: ReactNode }) {
                 className="w-full pl-8 pr-2 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder:text-slate-400"
               />
             </div>
-            <div className="max-h-[200px] overflow-y-scroll overflow-x-hidden flex flex-col gap-0.5 pr-0.5" style={{ scrollbarGutter: 'stable' }}>
+            <div className="flex-1 min-h-0 overflow-y-scroll overflow-x-hidden flex flex-col gap-0.5 pr-0.5" style={{ scrollbarGutter: 'stable' }}>
               <button
                 type="button"
                 onClick={() => ctx.setSelectedFolderId(null)}
                 className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium transition-colors w-full text-left flex-shrink-0 ${
-                  ctx.selectedFolderId === null ? 'bg-[var(--sidebar-accent-soft)] text-[var(--sidebar-accent-dark)]' : 'text-slate-600 hover:bg-slate-50/80'
+                  ctx.selectedFolderId === null ? 'bg-[var(--sidebar-accent-soft)] text-[var(--sidebar-accent-dark)]' : 'text-slate-600 hover:bg-slate-50/80 bg-slate-50/60'
                 }`}
               >
                 <FolderOpen className="w-4 h-4 flex-shrink-0" />
@@ -100,36 +99,55 @@ export default function Layout({ children }: { children: ReactNode }) {
                 type="button"
                 onClick={() => ctx.setSelectedFolderId('')}
                 className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium transition-colors w-full text-left flex-shrink-0 ${
-                  ctx.selectedFolderId === '' ? 'bg-[var(--sidebar-accent-soft)] text-[var(--sidebar-accent-dark)]' : 'text-slate-600 hover:bg-slate-50/80'
+                  ctx.selectedFolderId === '' ? 'bg-[var(--sidebar-accent-soft)] text-[var(--sidebar-accent-dark)]' : 'text-slate-600 hover:bg-slate-50/80 bg-slate-100/60'
                 }`}
               >
                 <FolderMinus className="w-4 h-4 flex-shrink-0" />
                 <span className="truncate">No folder</span>
               </button>
-              {filteredFolders.map(f => (
-                <div key={f.id} className="flex items-center group flex-shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => ctx.setSelectedFolderId(f.id)}
-                    className={`flex-1 min-w-0 flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium transition-colors text-left truncate ${
-                      ctx.selectedFolderId === f.id ? 'bg-amber-50 text-amber-800' : 'text-slate-600 hover:bg-slate-50/80'
-                    }`}
-                  >
-                    <FolderIcon className="w-4 h-4 flex-shrink-0 text-amber-500" />
-                    <span className="truncate">{f.name}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => handleDeleteFolder(e, f.id)}
-                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                    title="Delete folder"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
+              {filteredFolders.map((f, i) => {
+                const colorClasses = [
+                  'bg-amber-50/80 hover:bg-amber-100/80',
+                  'bg-blue-50/80 hover:bg-blue-100/80',
+                  'bg-emerald-50/80 hover:bg-emerald-100/80',
+                  'bg-violet-50/80 hover:bg-violet-100/80',
+                  'bg-rose-50/80 hover:bg-rose-100/80',
+                  'bg-cyan-50/80 hover:bg-cyan-100/80',
+                ]
+                const activeColors = [
+                  'bg-amber-100 text-amber-900',
+                  'bg-blue-100 text-blue-900',
+                  'bg-emerald-100 text-emerald-900',
+                  'bg-violet-100 text-violet-900',
+                  'bg-rose-100 text-rose-900',
+                  'bg-cyan-100 text-cyan-900',
+                ]
+                const idx = i % colorClasses.length
+                const baseClass = colorClasses[idx]
+                const activeClass = activeColors[idx]
+                return (
+                  <div key={f.id} className={`flex items-center group flex-shrink-0 rounded-lg ${ctx.selectedFolderId === f.id ? activeClass : baseClass}`}>
+                    <button
+                      type="button"
+                      onClick={() => ctx.setSelectedFolderId(f.id)}
+                      className="flex-1 min-w-0 flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium transition-colors text-left truncate"
+                    >
+                      <FolderIcon className="w-4 h-4 flex-shrink-0 text-current opacity-80" />
+                      <span className="truncate">{f.name}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleDeleteFolder(e, f.id)}
+                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                      title="Delete folder"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                )
+              })}
             </div>
-            <div className="flex gap-1.5 pt-0.5">
+            <div className="flex gap-1.5 pt-0.5 flex-shrink-0">
               <input
                 ref={newFolderInputRef}
                 type="text"
@@ -153,7 +171,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         )}
 
         {/* Nav */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto min-h-0">
+        <nav className="flex-shrink-0 px-3 py-4 space-y-1 overflow-y-auto min-h-0">
           {NAV.map(({ to, label, icon: Icon, desc }) => {
             const active = to === '/' ? pathname === '/' || pathname.startsWith('/meeting/') : to === '/bin' ? pathname === '/bin' : pathname.startsWith(to)
             return (

@@ -299,6 +299,10 @@ async def delete_meeting(db: AsyncIOMotorDatabase, meeting_id: str) -> bool:
 
 # --- Folders ---
 
+def _folder_not_deleted_filter() -> dict[str, Any]:
+    """Exclude soft-deleted (trashed) folders."""
+    return {"$or": [{"deleted_at": {"$exists": False}}, {"deleted_at": None}]}
+
 
 async def create_folder(db: AsyncIOMotorDatabase, name: str) -> dict[str, Any]:
     """Create a folder. Returns folder dict with id, name, created_at."""
@@ -310,8 +314,8 @@ async def create_folder(db: AsyncIOMotorDatabase, name: str) -> dict[str, Any]:
 
 
 async def list_folders(db: AsyncIOMotorDatabase) -> list[dict[str, Any]]:
-    """List all folders sorted by name."""
-    cursor = db["folders"].find({}).sort("name", 1)
+    """List all non-trashed folders sorted by name."""
+    cursor = db["folders"].find(_folder_not_deleted_filter()).sort("name", 1)
     out = []
     async for doc in cursor:
         out.append({"id": doc["id"], "name": doc["name"], "created_at": doc.get("created_at")})
@@ -319,15 +323,48 @@ async def list_folders(db: AsyncIOMotorDatabase) -> list[dict[str, Any]]:
 
 
 async def get_folder(db: AsyncIOMotorDatabase, folder_id: str) -> dict[str, Any] | None:
-    """Get a folder by id."""
-    doc = await db["folders"].find_one({"id": folder_id})
+    """Get a non-trashed folder by id."""
+    doc = await db["folders"].find_one({"id": folder_id, **_folder_not_deleted_filter()})
     if not doc:
         return None
     return {"id": doc["id"], "name": doc["name"], "created_at": doc.get("created_at")}
 
 
+async def soft_delete_folder(db: AsyncIOMotorDatabase, folder_id: str) -> bool:
+    """Move folder to bin (set deleted_at). Meetings keep their folder_id; folder stays in trash."""
+    result = await db["folders"].update_one(
+        {"id": folder_id, **_folder_not_deleted_filter()},
+        {"$set": {"deleted_at": _now()}},
+    )
+    return result.modified_count > 0
+
+
+async def restore_folder(db: AsyncIOMotorDatabase, folder_id: str) -> bool:
+    """Restore a folder from bin (unset deleted_at)."""
+    result = await db["folders"].update_one(
+        {"id": folder_id},
+        {"$unset": {"deleted_at": ""}},
+    )
+    return result.modified_count > 0
+
+
+async def list_trashed_folders(db: AsyncIOMotorDatabase, skip: int = 0, limit: int = 100) -> list[dict[str, Any]]:
+    """List folders in bin (deleted_at set), newest first."""
+    cursor = (
+        db["folders"]
+        .find({"deleted_at": {"$exists": True, "$ne": None}})
+        .sort("deleted_at", -1)
+        .skip(skip)
+        .limit(limit)
+    )
+    out = []
+    async for doc in cursor:
+        out.append({"id": doc["id"], "name": doc["name"], "created_at": doc.get("created_at")})
+    return out
+
+
 async def delete_folder(db: AsyncIOMotorDatabase, folder_id: str) -> bool:
-    """Delete a folder and clear folder_id on all meetings in that folder. Returns True if deleted."""
+    """Permanently delete a folder and clear folder_id on all meetings in that folder. Returns True if deleted."""
     result = await db["folders"].delete_one({"id": folder_id})
     if result.deleted_count > 0:
         await db["meetings"].update_many({"folder_id": folder_id}, {"$set": {"folder_id": None}})

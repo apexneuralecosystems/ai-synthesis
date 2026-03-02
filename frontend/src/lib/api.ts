@@ -135,8 +135,24 @@ function folderCreate(name: string) {
   return req<Folder>('/folders', { method: 'POST', body: JSON.stringify({ name }) })
 }
 
+/** Move folder to bin (soft delete). */
 function folderDelete(folderId: string) {
   return req<void>(`/folders/${folderId}`, { method: 'DELETE' })
+}
+
+/** List folders in bin. */
+function foldersTrash() {
+  return req<{ folders: Folder[] }>('/folders/trash').then(r => r.folders ?? [])
+}
+
+/** Restore a folder from bin. */
+function restoreFolder(folderId: string) {
+  return req<{ status: string; folder_id: string }>(`/folders/${folderId}/restore`, { method: 'POST' })
+}
+
+/** Permanently delete a folder (meetings in it move to no folder). */
+function deleteFolderPermanent(folderId: string) {
+  return req<void>(`/folders/${folderId}/permanent`, { method: 'DELETE' })
 }
 
 export const api = {
@@ -149,6 +165,9 @@ export const api = {
   },
   report: (id: string) => req<Record<string, unknown>>(`/reports/${id}`),
   deleteReport: (id: string) => req<{ status: string }>(`/reports/${id}`, { method: 'DELETE' }),
+  reportsTrash: () => req<PainReportItem[]>('/reports/trash'),
+  restoreReport: (id: string) => req<{ status: string; report_id: string }>(`/reports/${id}/restore`, { method: 'POST' }),
+  deleteReportPermanent: (id: string) => req<{ status: string }>(`/reports/${id}/permanent`, { method: 'DELETE' }),
   synthesize: (meetingId: string, callType: string, interviewer: string) =>
     req<SynthResult>('/synthesize', {
       method: 'POST',
@@ -157,6 +176,9 @@ export const api = {
   deltas: () => req<DeltaItem[]>('/deltas'),
   delta: (id: string) => req<Record<string, unknown>>(`/deltas/${id}`),
   deleteDelta: (id: string) => req<{ status: string }>(`/deltas/${id}`, { method: 'DELETE' }),
+  deltasTrash: () => req<DeltaItem[]>('/deltas/trash'),
+  restoreDelta: (id: string) => req<{ status: string; delta_id: string }>(`/deltas/${id}/restore`, { method: 'POST' }),
+  deleteDeltaPermanent: (id: string) => req<{ status: string }>(`/deltas/${id}/permanent`, { method: 'DELETE' }),
   runDelta: (reportIds: string[]) =>
     req<DeltaResult>('/delta', { method: 'POST', body: JSON.stringify({ report_ids: reportIds }) }),
   meetingChat: (meetingId: string, messages: ChatMessage[]) =>
@@ -194,4 +216,7 @@ export const api = {
   foldersList,
   folderCreate,
   folderDelete,
+  foldersTrash,
+  restoreFolder,
+  deleteFolderPermanent,
 }

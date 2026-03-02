@@ -337,18 +337,23 @@ async def chat_with_meeting(meeting_id: str, body: ChatReq):
 
 # ═══════════════ Pain Report Endpoints ═══════════════
 
+def _not_deleted_filter() -> dict[str, Any]:
+    """Exclude soft-deleted (trashed) documents."""
+    return {"$or": [{"deleted_at": {"$exists": False}}, {"deleted_at": None}]}
+
+
 @app.get("/api/reports")
 async def list_reports(folder_id: str | None = Query(None, description="Filter by folder: only reports whose meeting is in this folder")):
-    """List pain reports, optionally filtered by folder_id (meeting's folder)."""
+    """List non-trashed pain reports, optionally filtered by folder_id (meeting's folder)."""
     db = get_db()
-    query: dict[str, Any] = {}
+    query: dict[str, Any] = {"$and": [_not_deleted_filter()]}
     if folder_id is not None:
         if folder_id == "":
             meeting_query = {"$or": [{"folder_id": {"$exists": False}}, {"folder_id": None}, {"folder_id": ""}]}
         else:
             meeting_query = {"folder_id": folder_id}
         meeting_ids = [doc["meeting_id"] for doc in db["meetings"].find(meeting_query, {"meeting_id": 1})]
-        query["meeting_id"] = {"$in": meeting_ids}
+        query["$and"] = query.get("$and", []) + [{"meeting_id": {"$in": meeting_ids}}]
     cursor = db["pain_reports"].find(query, {
         "call_id": 1, "meeting_id": 1, "meeting_title": 1,
         "call_type": 1, "created_at": 1, "usage": 1, "_id": 1,
@@ -373,14 +378,42 @@ async def list_reports(folder_id: str | None = Query(None, description="Filter b
     return results
 
 
+@app.get("/api/reports/trash")
+async def list_reports_trash():
+    """List pain reports in bin (soft-deleted)."""
+    db = get_db()
+    cursor = db["pain_reports"].find(
+        {"deleted_at": {"$exists": True, "$ne": None}},
+        {"call_id": 1, "meeting_id": 1, "meeting_title": 1, "call_type": 1, "created_at": 1, "_id": 1,
+         "report_card.pain_validity_score": 1, "report_card.executive_summary": 1, "report_card.pain_points": 1}
+    ).sort("deleted_at", DESCENDING)
+    results = []
+    for doc in cursor:
+        card = doc.get("report_card", {})
+        results.append({
+            "_id": str(doc["_id"]),
+            "call_id": doc.get("call_id", ""),
+            "meeting_id": doc.get("meeting_id", ""),
+            "meeting_title": doc.get("meeting_title", ""),
+            "call_type": doc.get("call_type", ""),
+            "created_at": doc.get("created_at", ""),
+            "pain_count": len(card.get("pain_points", [])),
+            "validity_score": card.get("pain_validity_score"),
+            "summary": (card.get("executive_summary") or "")[:200],
+        })
+    return results
+
+
 @app.get("/api/reports/{report_id}")
 async def get_report(report_id: str):
-    """Get a single pain report."""
+    """Get a single non-trashed pain report."""
     db = get_db()
+    q: dict[str, Any] = {"$and": [_not_deleted_filter()]}
     try:
-        doc = db["pain_reports"].find_one({"_id": ObjectId(report_id)})
+        q["_id"] = ObjectId(report_id)
     except Exception:
-        doc = db["pain_reports"].find_one({"call_id": report_id})
+        q["call_id"] = report_id
+    doc = db["pain_reports"].find_one(q)
     if not doc:
         raise HTTPException(404, "Report not found")
     return serialize(doc)
@@ -388,6 +421,46 @@ async def get_report(report_id: str):
 
 @app.delete("/api/reports/{report_id}")
 async def delete_report(report_id: str):
+    """Move report to bin (soft delete)."""
+    db = get_db()
+    now = datetime.now(timezone.utc)
+    try:
+        result = db["pain_reports"].update_one(
+            {"_id": ObjectId(report_id), **_not_deleted_filter()},
+            {"$set": {"deleted_at": now}},
+        )
+    except Exception:
+        result = db["pain_reports"].update_one(
+            {"call_id": report_id, **_not_deleted_filter()},
+            {"$set": {"deleted_at": now}},
+        )
+    if result.modified_count == 0:
+        raise HTTPException(404, "Report not found")
+    return {"status": "deleted"}
+
+
+@app.post("/api/reports/{report_id}/restore")
+async def restore_report(report_id: str):
+    """Restore a report from bin."""
+    db = get_db()
+    try:
+        result = db["pain_reports"].update_one(
+            {"_id": ObjectId(report_id)},
+            {"$unset": {"deleted_at": ""}},
+        )
+    except Exception:
+        result = db["pain_reports"].update_one(
+            {"call_id": report_id},
+            {"$unset": {"deleted_at": ""}},
+        )
+    if result.modified_count == 0:
+        raise HTTPException(404, "Report not found or not in bin")
+    return {"status": "restored", "report_id": report_id}
+
+
+@app.delete("/api/reports/{report_id}/permanent")
+async def permanent_delete_report(report_id: str):
+    """Permanently delete a report."""
     db = get_db()
     try:
         result = db["pain_reports"].delete_one({"_id": ObjectId(report_id)})
@@ -414,7 +487,7 @@ async def synthesize(req: SynthesizeReq):
     title = meeting.get("title", req.meeting_id)
     call_id = f"{req.meeting_id[:8]}-{req.call_type[:3].upper()}"
 
-    existing = db["pain_reports"].find_one({"call_id": call_id})
+    existing = db["pain_reports"].find_one({"call_id": call_id, **_not_deleted_filter()})
     if existing:
         return {
             "status": "already_exists",
@@ -493,9 +566,35 @@ async def synthesize(req: SynthesizeReq):
 
 @app.get("/api/deltas")
 async def list_deltas():
-    """List all delta reports."""
+    """List all non-trashed delta reports."""
     db = get_db()
-    cursor = db["delta_reports"].find({}).sort("created_at", DESCENDING)
+    cursor = db["delta_reports"].find(_not_deleted_filter()).sort("created_at", DESCENDING)
+    results = []
+    for doc in cursor:
+        dr = doc.get("delta_report", {})
+        meta = dr.get("meta", {})
+        oa = dr.get("overall_assessment", {})
+        results.append({
+            "_id": str(doc["_id"]),
+            "source_calls": meta.get("source_calls", []),
+            "source_call_types": meta.get("source_call_types", []),
+            "readiness": oa.get("readiness_for_proposal", ""),
+            "signal_strength": oa.get("signal_strength", ""),
+            "agreements_count": len(dr.get("agreements", [])),
+            "contradictions_count": len(dr.get("contradictions", [])),
+            "focus_count": len(dr.get("recommended_focus", [])),
+            "created_at": doc.get("created_at", ""),
+        })
+    return results
+
+
+@app.get("/api/deltas/trash")
+async def list_deltas_trash():
+    """List delta reports in bin (soft-deleted)."""
+    db = get_db()
+    cursor = db["delta_reports"].find(
+        {"deleted_at": {"$exists": True, "$ne": None}}
+    ).sort("deleted_at", DESCENDING)
     results = []
     for doc in cursor:
         dr = doc.get("delta_report", {})
@@ -517,8 +616,9 @@ async def list_deltas():
 
 @app.get("/api/deltas/{delta_id}")
 async def get_delta(delta_id: str):
+    """Get a single non-trashed delta report."""
     db = get_db()
-    doc = db["delta_reports"].find_one({"_id": ObjectId(delta_id)})
+    doc = db["delta_reports"].find_one({"_id": ObjectId(delta_id), **_not_deleted_filter()})
     if not doc:
         raise HTTPException(404, "Delta report not found")
     return serialize(doc)
@@ -526,6 +626,34 @@ async def get_delta(delta_id: str):
 
 @app.delete("/api/deltas/{delta_id}")
 async def delete_delta(delta_id: str):
+    """Move delta report to bin (soft delete)."""
+    db = get_db()
+    now = datetime.now(timezone.utc)
+    result = db["delta_reports"].update_one(
+        {"_id": ObjectId(delta_id), **_not_deleted_filter()},
+        {"$set": {"deleted_at": now}},
+    )
+    if result.modified_count == 0:
+        raise HTTPException(404, "Not found")
+    return {"status": "deleted"}
+
+
+@app.post("/api/deltas/{delta_id}/restore")
+async def restore_delta(delta_id: str):
+    """Restore a delta report from bin."""
+    db = get_db()
+    result = db["delta_reports"].update_one(
+        {"_id": ObjectId(delta_id)},
+        {"$unset": {"deleted_at": ""}},
+    )
+    if result.modified_count == 0:
+        raise HTTPException(404, "Delta not found or not in bin")
+    return {"status": "restored", "delta_id": delta_id}
+
+
+@app.delete("/api/deltas/{delta_id}/permanent")
+async def permanent_delete_delta(delta_id: str):
+    """Permanently delete a delta report."""
     db = get_db()
     result = db["delta_reports"].delete_one({"_id": ObjectId(delta_id)})
     if result.deleted_count == 0:
@@ -543,9 +671,9 @@ async def run_delta(req: DeltaReq):
     cards: list[dict] = []
     for rid in req.report_ids:
         try:
-            doc = db["pain_reports"].find_one({"_id": ObjectId(rid)})
+            doc = db["pain_reports"].find_one({"_id": ObjectId(rid), **_not_deleted_filter()})
         except Exception:
-            doc = db["pain_reports"].find_one({"call_id": rid})
+            doc = db["pain_reports"].find_one({"call_id": rid, **_not_deleted_filter()})
         if not doc:
             raise HTTPException(404, f"Report not found: {rid}")
         rc = doc.get("report_card", {})

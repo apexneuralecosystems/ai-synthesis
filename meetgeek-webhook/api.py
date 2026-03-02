@@ -16,6 +16,9 @@ from database import (
     count_meetings,
     search_meetings,
     delete_meeting,
+    soft_delete_meeting,
+    restore_meeting,
+    list_trashed_meetings,
     get_meeting_stats,
     get_transcript_sentences_for_meeting,
     get_last_meeting_id,
@@ -347,6 +350,21 @@ async def search_meetings_api(
     )
 
 
+@router.get("/meetings/trash", response_model=MeetingListResponse)
+async def list_trash(
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
+    """List meetings in bin (soft-deleted)."""
+    meetings = await list_trashed_meetings(db, skip=0, limit=500)
+    return MeetingListResponse(
+        meetings=[_meeting_to_item(m) for m in meetings],
+        total=len(meetings),
+        page=1,
+        page_size=len(meetings),
+        total_pages=1,
+    )
+
+
 @router.get("/meetings/last-id")
 async def get_last_meeting_id_api(db: AsyncIOMotorDatabase = Depends(get_db)):
     """Return the last meeting_id stored (most recent webhook or sync)."""
@@ -570,7 +588,31 @@ async def delete_meeting_api(
     meeting_id: str,
     db: AsyncIOMotorDatabase = Depends(get_db),
 ):
-    """Delete a meeting."""
+    """Move a meeting to bin (soft delete). Use DELETE /meetings/{id}/permanent to remove permanently."""
+    updated = await soft_delete_meeting(db, meeting_id)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    return None
+
+
+@router.post("/meetings/{meeting_id}/restore", status_code=200)
+async def restore_meeting_api(
+    meeting_id: str,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
+    """Restore a meeting from bin."""
+    updated = await restore_meeting(db, meeting_id)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Meeting not found or not in bin")
+    return {"status": "restored", "meeting_id": meeting_id}
+
+
+@router.delete("/meetings/{meeting_id}/permanent", status_code=204)
+async def permanent_delete_meeting_api(
+    meeting_id: str,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
+    """Permanently delete a meeting (cannot be undone)."""
     deleted = await delete_meeting(db, meeting_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Meeting not found")

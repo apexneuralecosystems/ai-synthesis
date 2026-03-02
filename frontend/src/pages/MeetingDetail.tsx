@@ -97,16 +97,16 @@ export default function MeetingDetail() {
     }
   }
 
-  async function handlePermanentDelete() {
+  async function handleMoveToBin() {
     if (!id || !meeting || deletingMeeting) return
-    const ok = window.confirm('Permanently delete this meeting? This cannot be undone.')
+    const ok = window.confirm('Move this meeting to Bin? You can restore or permanently delete it from the Bin page.')
     if (!ok) return
     setDeletingMeeting(true)
     try {
       await api.deleteMeeting(id)
-      navigate('/meetings')
+      navigate('/')
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Failed to delete meeting'
+      const msg = e instanceof Error ? e.message : 'Failed to move to bin'
       alert(msg)
     } finally {
       setDeletingMeeting(false)
@@ -351,20 +351,20 @@ export default function MeetingDetail() {
         )}
       </div>
 
-      {/* Danger zone: permanently delete meeting */}
+      {/* Danger zone: move to bin */}
       <div className="mt-8 p-6 bg-white border border-red-200/80 rounded-2xl">
         <p className="text-[11px] font-bold text-red-600 uppercase tracking-widest mb-2">Danger zone</p>
         <p className="text-[13px] text-slate-600 mb-3">
-          Permanently remove this meeting and all its data. This cannot be undone.
+          Move this meeting to Bin. From Bin you can restore it or permanently delete it.
         </p>
         <button
           type="button"
-          onClick={handlePermanentDelete}
+          onClick={handleMoveToBin}
           disabled={deletingMeeting}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-red-300 text-red-600 text-sm font-semibold hover:bg-red-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
         >
           <Trash2 className="w-4 h-4" />
-          {deletingMeeting ? 'Deleting...' : 'Permanently delete meeting'}
+          {deletingMeeting ? 'Moving...' : 'Move to bin'}
         </button>
       </div>
 

@@ -3,6 +3,7 @@ import { MeetingsProvider } from './context/MeetingsContext'
 import Layout from './components/Layout'
 import Meetings from './pages/Meetings'
 import MeetingDetail from './pages/MeetingDetail'
+import Bin from './pages/Bin'
 import Synthesis from './pages/Synthesis'
 import Reports from './pages/Reports'
 import ReportDetail from './pages/ReportDetail'
@@ -16,6 +17,7 @@ export default function App() {
         <Routes>
         <Route path="/" element={<Meetings />} />
         <Route path="/meeting/:id" element={<MeetingDetail />} />
+        <Route path="/bin" element={<Bin />} />
         <Route path="/synthesis" element={<Synthesis />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/reports/:id" element={<ReportDetail />} />

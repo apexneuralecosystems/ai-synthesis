@@ -173,8 +173,18 @@ export const api = {
     req<MeetingDetail>(`/meetings/${meetingId}/transcript`, {
       method: 'DELETE',
     }),
+  /** Move meeting to bin (soft delete). */
   deleteMeeting: (meetingId: string) =>
     req<void>(`/meetings/${meetingId}`, { method: 'DELETE' }),
+  /** List meetings in bin. */
+  meetingsTrash: () =>
+    req<{ meetings: Meeting[] }>('/meetings/trash').then(r => r.meetings ?? []),
+  /** Restore a meeting from bin. */
+  restoreMeeting: (meetingId: string) =>
+    req<{ status: string; meeting_id: string }>(`/meetings/${meetingId}/restore`, { method: 'POST' }),
+  /** Permanently delete a meeting (only from bin). */
+  deleteMeetingPermanent: (meetingId: string) =>
+    req<void>(`/meetings/${meetingId}/permanent`, { method: 'DELETE' }),
   updateMeeting: (meetingId: string, body: { title?: string | null; folder_id?: string | null }) =>
     req<MeetingDetail>(`/meetings/${meetingId}`, {
       method: 'PATCH',

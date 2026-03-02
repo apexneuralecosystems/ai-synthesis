@@ -146,6 +146,20 @@ async def save_meeting(db: AsyncIOMotorDatabase, meeting_data: dict[str, Any]) -
     return _doc_to_meeting(out)
 
 
+def _not_deleted_filter() -> dict[str, Any]:
+    """Exclude soft-deleted (trashed) meetings from normal lists."""
+    return {"$or": [{"deleted_at": {"$exists": False}}, {"deleted_at": None}]}
+
+
+def _folder_filter(folder_id: str | None) -> dict[str, Any]:
+    """Build query filter for folder_id. None = no filter, '' = no folder (unset/empty)."""
+    if folder_id is None:
+        return {}
+    if folder_id == "":
+        return {"$or": [{"folder_id": {"$exists": False}}, {"folder_id": None}, {"folder_id": ""}]}
+    return {"folder_id": folder_id}
+
+
 async def update_meeting(
     db: AsyncIOMotorDatabase, meeting_id: str, data: dict[str, Any]
 ) -> dict[str, Any] | None:
@@ -171,27 +185,18 @@ async def update_meeting(
 
 
 async def get_meeting(db: AsyncIOMotorDatabase, meeting_id: str) -> dict[str, Any] | None:
-    """Get a single meeting by meeting_id."""
-    doc = await db["meetings"].find_one({"meeting_id": meeting_id})
+    """Get a single non-trashed meeting by meeting_id."""
+    doc = await db["meetings"].find_one({"meeting_id": meeting_id, **_not_deleted_filter()})
     return _doc_to_meeting(doc) if doc else None
 
 
 async def get_meeting_by_uuid(
     db: AsyncIOMotorDatabase, id: UUID | str
 ) -> dict[str, Any] | None:
-    """Get a single meeting by primary key id (string or UUID)."""
+    """Get a single non-trashed meeting by primary key id (string or UUID)."""
     id_str = str(id) if isinstance(id, UUID) else id
-    doc = await db["meetings"].find_one({"id": id_str})
+    doc = await db["meetings"].find_one({"id": id_str, **_not_deleted_filter()})
     return _doc_to_meeting(doc) if doc else None
-
-
-def _folder_filter(folder_id: str | None) -> dict[str, Any]:
-    """Build query filter for folder_id. None = no filter, '' = no folder (unset/empty)."""
-    if folder_id is None:
-        return {}
-    if folder_id == "":
-        return {"$or": [{"folder_id": {"$exists": False}}, {"folder_id": None}, {"folder_id": ""}]}
-    return {"folder_id": folder_id}
 
 
 async def get_all_meetings(
@@ -200,8 +205,8 @@ async def get_all_meetings(
     limit: int = 50,
     folder_id: str | None = None,
 ) -> list[dict[str, Any]]:
-    """List meetings with pagination, ordered by created_at desc. Optional folder_id filter."""
-    query = _folder_filter(folder_id)
+    """List non-trashed meetings with pagination, ordered by created_at desc. Optional folder_id filter."""
+    query = {"$and": [_not_deleted_filter(), _folder_filter(folder_id)]} if _folder_filter(folder_id) else _not_deleted_filter()
     cursor = (
         db["meetings"]
         .find(query)
@@ -220,8 +225,8 @@ async def count_meetings(
     query: str | None = None,
     folder_id: str | None = None,
 ) -> int:
-    """Count total meetings, optionally filtered by search query and/or folder_id."""
-    q: dict[str, Any] = _folder_filter(folder_id)
+    """Count non-trashed meetings, optionally filtered by search query and/or folder_id."""
+    q: dict[str, Any] = {"$and": [_not_deleted_filter(), _folder_filter(folder_id)]} if _folder_filter(folder_id) else _not_deleted_filter()
     if query:
         pattern = {"$regex": query, "$options": "i"}
         search_clause = {"$or": [{"transcript": pattern}, {"title": pattern}]}
@@ -235,11 +240,12 @@ async def search_meetings(
     skip: int = 0,
     limit: int = 50,
 ) -> list[dict[str, Any]]:
-    """Search meetings by transcript or title (case-insensitive regex)."""
+    """Search non-trashed meetings by transcript or title (case-insensitive regex)."""
     pattern = {"$regex": query, "$options": "i"}
+    q = {"$and": [_not_deleted_filter(), {"$or": [{"transcript": pattern}, {"title": pattern}]}]}
     cursor = (
         db["meetings"]
-        .find({"$or": [{"transcript": pattern}, {"title": pattern}]})
+        .find(q)
         .sort("created_at", -1)
         .skip(skip)
         .limit(limit)
@@ -250,8 +256,43 @@ async def search_meetings(
     return out
 
 
+async def soft_delete_meeting(db: AsyncIOMotorDatabase, meeting_id: str) -> bool:
+    """Move meeting to bin (set deleted_at). Returns True if updated."""
+    result = await db["meetings"].update_one(
+        {"meeting_id": meeting_id, **_not_deleted_filter()},
+        {"$set": {"deleted_at": _now(), "updated_at": _now()}},
+    )
+    return result.modified_count > 0
+
+
+async def restore_meeting(db: AsyncIOMotorDatabase, meeting_id: str) -> bool:
+    """Restore a trashed meeting (unset deleted_at). Returns True if updated."""
+    result = await db["meetings"].update_one(
+        {"meeting_id": meeting_id},
+        {"$unset": {"deleted_at": ""}, "$set": {"updated_at": _now()}},
+    )
+    return result.modified_count > 0
+
+
+async def list_trashed_meetings(
+    db: AsyncIOMotorDatabase, skip: int = 0, limit: int = 100
+) -> list[dict[str, Any]]:
+    """List meetings that are in bin (deleted_at set), newest first."""
+    cursor = (
+        db["meetings"]
+        .find({"deleted_at": {"$exists": True, "$ne": None}})
+        .sort("deleted_at", -1)
+        .skip(skip)
+        .limit(limit)
+    )
+    out = []
+    async for doc in cursor:
+        out.append(_doc_to_meeting(doc))
+    return out
+
+
 async def delete_meeting(db: AsyncIOMotorDatabase, meeting_id: str) -> bool:
-    """Delete a meeting by meeting_id. Returns True if deleted."""
+    """Permanently delete a meeting by meeting_id. Returns True if deleted."""
     result = await db["meetings"].delete_one({"meeting_id": meeting_id})
     return result.deleted_count > 0
 
@@ -386,12 +427,13 @@ async def get_last_meeting_id(db: AsyncIOMotorDatabase) -> str | None:
 
 
 async def get_meeting_stats(db: AsyncIOMotorDatabase) -> dict[str, Any]:
-    """Return counts and latest meetings for dashboard."""
+    """Return counts and latest meetings for dashboard (excludes trashed)."""
     coll = db["meetings"]
-    total_meetings = await coll.count_documents({})
-    total_transcripts = await coll.count_documents({"transcript": {"$ne": None, "$exists": True}})
-    meetings_processed_by_ai = await coll.count_documents({"processed": True})
-    cursor = coll.find({}).sort("created_at", -1).limit(5)
+    not_deleted = _not_deleted_filter()
+    total_meetings = await coll.count_documents(not_deleted)
+    total_transcripts = await coll.count_documents({**not_deleted, "transcript": {"$ne": None, "$exists": True}})
+    meetings_processed_by_ai = await coll.count_documents({**not_deleted, "processed": True})
+    cursor = coll.find(not_deleted).sort("created_at", -1).limit(5)
     latest_meetings = [_doc_to_meeting(d) async for d in cursor]
     return {
         "total_meetings": total_meetings,

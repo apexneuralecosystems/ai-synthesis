@@ -102,16 +102,16 @@ export default function Meetings() {
     return matchesSearch && matchesFrom && matchesTo
   })
 
-  async function handleDeleteMeeting(e: React.MouseEvent, meetingId: string) {
+  async function handleMoveToBin(e: React.MouseEvent, meetingId: string) {
     e.preventDefault()
     e.stopPropagation()
-    if (!confirm('Delete this meeting permanently? This cannot be undone.')) return
+    if (!confirm('Move this meeting to Bin? You can restore or permanently delete it from Bin.')) return
     setDeletingId(meetingId)
     try {
       await api.deleteMeeting(meetingId)
       setMeetings(prev => prev.filter(m => m.meeting_id !== meetingId))
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to delete meeting'
+      const msg = err instanceof Error ? err.message : 'Failed to move to bin'
       setError(msg)
     } finally {
       setDeletingId(null)
@@ -361,21 +361,21 @@ export default function Meetings() {
                       <div className="border-t border-slate-100 my-1" />
                       <button
                         type="button"
-                        onClick={(e) => { handleDeleteMeeting(e, m.meeting_id); setOpenMoveId(null) }}
+                        onClick={(e) => { handleMoveToBin(e, m.meeting_id); setOpenMoveId(null) }}
                         disabled={deletingId === m.meeting_id}
                         className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 font-medium"
                       >
-                        Permanently delete meeting
+                        Move to bin
                       </button>
                     </div>
                   )}
                 </div>
                 <button
                   type="button"
-                  onClick={(e) => handleDeleteMeeting(e, m.meeting_id)}
+                  onClick={(e) => handleMoveToBin(e, m.meeting_id)}
                   disabled={deletingId === m.meeting_id}
                   className="p-2 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                  title="Permanently delete meeting"
+                  title="Move to bin"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>

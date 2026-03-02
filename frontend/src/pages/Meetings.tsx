@@ -4,9 +4,15 @@ import { api } from '../lib/api'
 import type { Meeting, MeetingImportPayload, Folder } from '../lib/api'
 import { Search, Calendar, Clock, Users, ChevronRight, Inbox, Mic, Upload, Trash2, FolderPlus, FolderOpen, Folder as FolderIcon, MoreVertical, FolderMinus } from 'lucide-react'
 
-/** Normalize date from list (backend may send date_ist/date_iso) */
-function getMeetingDate(m: Meeting): string {
-  return m.date || m.date_ist || m.date_iso || ''
+/** Prefer ISO for parsing; backend sends date_ist (e.g. "26 Feb 2025, 10:30 AM IST") and date_iso (parseable) */
+function getMeetingDateForParse(m: Meeting): string {
+  return (m.date_iso || m.date || m.date_ist || '') as string
+}
+
+/** Human-readable date from backend when available (date_ist); else we format from date_iso/date */
+function getMeetingDateDisplay(m: Meeting): string {
+  const raw = m.date_ist || m.date_iso || m.date || ''
+  return raw
 }
 
 /** Format for display: "Feb 26, 2025" */
@@ -96,7 +102,7 @@ export default function Meetings() {
       m.host_email?.toLowerCase().includes(q) ||
       m.meeting_id?.toLowerCase().includes(q) ||
       (Array.isArray(m.participants) && m.participants.some((p: string) => p?.toLowerCase().includes(q)))
-    const rawDate = getMeetingDate(m)
+    const rawDate = getMeetingDateForParse(m)
     const ts = rawDate ? new Date(rawDate).getTime() : null
     const fromTs = parseDateInput(dateFrom)
     const toTs = parseDateInput(dateTo)
@@ -231,10 +237,10 @@ export default function Meetings() {
   const folderCount = (fid: string) => selectedFolderId === null ? meetings.filter(m => m.folder_id === fid).length : 0
 
   return (
-    <div className="flex flex-col md:flex-row gap-6 lg:gap-8">
-      {/* Left sidebar: Folders - always first so it appears on the left when row layout */}
-      <aside className="md:w-52 lg:w-56 flex-shrink-0 order-first">
-        <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden md:sticky md:top-6">
+    <div className="flex flex-col sm:flex-row gap-6 lg:gap-8">
+      {/* Left sidebar: Folders - always rendered first, stays on the left from sm breakpoint */}
+      <aside className="sm:w-52 lg:w-56 flex-shrink-0 order-first">
+        <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden sm:sticky sm:top-6">
           <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50">
             <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
               <FolderOpen className="w-4 h-4 text-slate-400" />
@@ -407,13 +413,29 @@ export default function Meetings() {
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-[13px] text-slate-500">
                     <span className="flex items-center gap-1.5 font-medium">
                       <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                      {formatDateRelative(getMeetingDate(m)) ?? formatDate(getMeetingDate(m))}
+                      {(() => {
+                        const parseable = getMeetingDateForParse(m)
+                        const relative = formatDateRelative(parseable)
+                        const formatted = formatDate(parseable)
+                        const display = getMeetingDateDisplay(m)
+                        if (relative) return relative
+                        if (formatted !== '—') return formatted
+                        if (display) return display
+                        return '—'
+                      })()}
                     </span>
                     <span className="flex items-center gap-1.5 text-slate-500">
                       <Clock className="w-3.5 h-3.5 text-slate-400" />
-                      {formatTime(getMeetingDate(m))}
-                      {formatTime(getMeetingDate(m)) && ' · '}
-                      {formatDuration(m.duration_seconds ?? m.duration)}
+                      {(() => {
+                        const parseable = getMeetingDateForParse(m)
+                        const t = formatTime(parseable)
+                        if (t) return t
+                        const display = getMeetingDateDisplay(m)
+                        if (display && display.includes(',')) return display.split(',')[1]?.trim() || '—'
+                        return '—'
+                      })()}
+                      {' · '}
+                      {m.duration_display || formatDuration(m.duration_seconds ?? m.duration)}
                     </span>
                     {m.participants?.length > 0 && (
                       <span className="flex items-center gap-1.5 text-slate-500">

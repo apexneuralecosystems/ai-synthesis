@@ -28,6 +28,7 @@ export interface Meeting {
   date_ist?: string
   date_iso?: string
   duration_seconds?: number
+  duration_display?: string
   folder_id?: string | null
 }
 

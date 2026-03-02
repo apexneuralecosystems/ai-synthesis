@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 import type { PainReportItem, DeltaItem } from '../lib/api'
-import { GitCompare, Loader2, CheckCircle, AlertCircle, Trash2, Clock, Check, ArrowRight, FileText } from 'lucide-react'
+import { useMeetings } from '../context/MeetingsContext'
+import { GitCompare, Loader2, CheckCircle, AlertCircle, Trash2, Clock, Check, ArrowRight, FileText, FolderOpen } from 'lucide-react'
 
 const TYPE_BADGE: Record<string, string> = {
   CEO: 'bg-blue-100 text-blue-700',
@@ -12,6 +13,7 @@ const TYPE_BADGE: Record<string, string> = {
 
 export default function DeltaAnalysis() {
   const navigate = useNavigate()
+  const meetingsCtx = useMeetings()
   const [reports, setReports] = useState<PainReportItem[]>([])
   const [deltas, setDeltas] = useState<DeltaItem[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -21,11 +23,13 @@ export default function DeltaAnalysis() {
   const [loading, setLoading] = useState(true)
   const [deletingDelta, setDeletingDelta] = useState<string | null>(null)
 
+  const selectedFolderId = meetingsCtx?.selectedFolderId ?? null
+
   useEffect(() => {
-    Promise.all([api.reports(), api.deltas()])
+    Promise.all([api.reports(selectedFolderId ?? undefined), api.deltas()])
       .then(([r, d]) => { setReports(r); setDeltas(d) })
       .finally(() => setLoading(false))
-  }, [])
+  }, [selectedFolderId])
 
   function toggle(id: string) {
     setSelected(prev => {
@@ -75,8 +79,26 @@ export default function DeltaAnalysis() {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-[28px] font-extrabold text-slate-900 tracking-tight">Delta Analysis</h1>
-        <p className="text-[15px] text-slate-500 mt-1.5">Select 2 or more Pain Report Cards to compare across sessions</p>
+        <p className="text-[15px] text-slate-500 mt-1.5">Select a folder, then 2 or more Pain Report Cards to compare across sessions</p>
       </div>
+
+      {/* Folder selector */}
+      {meetingsCtx && (
+        <div className="mb-6 flex items-center gap-3 flex-wrap">
+          <FolderOpen className="w-5 h-5 text-slate-500" />
+          <span className="text-[13px] font-semibold text-slate-600">Folder:</span>
+          <select
+            value={selectedFolderId ?? ''}
+            onChange={e => meetingsCtx.setSelectedFolderId(e.target.value || null)}
+            className="text-[14px] border border-slate-200 rounded-xl bg-white px-4 py-2.5 min-w-[200px] focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400"
+          >
+            <option value="">All reports</option>
+            {meetingsCtx.folders.map(f => (
+              <option key={f.id} value={f.id}>{f.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Report selection */}

@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 import type { Meeting } from '../lib/api'
-import { Search, FlaskConical, Loader2, CheckCircle, AlertCircle, Mic, Calendar, ArrowRight } from 'lucide-react'
+import { useMeetings } from '../context/MeetingsContext'
+import { Search, FlaskConical, Loader2, CheckCircle, AlertCircle, Mic, Calendar, ArrowRight, FolderOpen } from 'lucide-react'
 
 const CALL_TYPES = ['CEO', 'Operations', 'Tech'] as const
 const CALL_DESCRIPTIONS: Record<string, string> = {
@@ -13,19 +14,22 @@ const CALL_DESCRIPTIONS: Record<string, string> = {
 
 export default function Synthesis() {
   const navigate = useNavigate()
+  const meetingsCtx = useMeetings()
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<Meeting | null>(null)
   const [callType, setCallType] = useState<string>('CEO')
   const [interviewer, setInterviewer] = useState('Anshul Jain')
   const [running, setRunning] = useState(false)
-  const [result, setResult] = useState<{ status: string; report_id: string; call_id: string; usage: Record<string, unknown>; quote_check: { quote: string; found: boolean }[] } | null>(null)
+  const [result, setResult] = useState<{ status: string; report_id: string; call_id: string; message?: string; usage?: Record<string, unknown>; quote_check?: { quote: string; found: boolean }[] } | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
 
+  const selectedFolderId = meetingsCtx?.selectedFolderId ?? null
+
   useEffect(() => {
-    api.meetings().then(setMeetings).finally(() => setLoading(false))
-  }, [])
+    api.meetingsAll(selectedFolderId ?? undefined).then(setMeetings).finally(() => setLoading(false))
+  }, [selectedFolderId])
 
   const filtered = meetings
     .filter(m => m.has_transcript)
@@ -56,8 +60,26 @@ export default function Synthesis() {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-[28px] font-extrabold text-slate-900 tracking-tight">Synthesis Engine</h1>
-        <p className="text-[15px] text-slate-500 mt-1.5">Select a meeting and generate a Pain Report Card using GPT-4o</p>
+        <p className="text-[15px] text-slate-500 mt-1.5">Select a folder, then a meeting, and generate a Pain Report Card using GPT-4o</p>
       </div>
+
+      {/* Folder selector */}
+      {meetingsCtx && (
+        <div className="mb-6 flex items-center gap-3 flex-wrap">
+          <FolderOpen className="w-5 h-5 text-slate-500" />
+          <span className="text-[13px] font-semibold text-slate-600">Folder:</span>
+          <select
+            value={selectedFolderId ?? ''}
+            onChange={e => meetingsCtx.setSelectedFolderId(e.target.value || null)}
+            className="text-[14px] border border-slate-200 rounded-xl bg-white px-4 py-2.5 min-w-[200px] focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400"
+          >
+            <option value="">All meetings</option>
+            {meetingsCtx.folders.map(f => (
+              <option key={f.id} value={f.id}>{f.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* Left panel: Meeting selection */}
@@ -206,49 +228,68 @@ export default function Synthesis() {
           {/* Result */}
           {result && (
             <div className="bg-white border border-slate-200/80 rounded-2xl p-6 space-y-5 animate-fade-in shadow-sm">
-              <div className="flex items-center gap-2.5">
-                <CheckCircle className="w-6 h-6 text-emerald-500" />
-                <p className="text-[16px] font-bold text-slate-900">Synthesis Complete</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                {[
-                  { label: 'Report ID', value: result.call_id },
-                  { label: 'Model', value: String((result.usage as Record<string, unknown>).model) },
-                  { label: 'Tokens In', value: String((result.usage as Record<string, unknown>).input_tokens).replace(/\B(?=(\d{3})+(?!\d))/g, ',') },
-                  { label: 'Tokens Out', value: String((result.usage as Record<string, unknown>).output_tokens).replace(/\B(?=(\d{3})+(?!\d))/g, ',') },
-                ].map(item => (
-                  <div key={item.label} className="bg-slate-50 rounded-xl p-3">
-                    <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">{item.label}</p>
-                    <p className="text-[13px] text-slate-700 font-semibold mt-1 font-mono">{item.value}</p>
+              {result.status === 'already_exists' ? (
+                <>
+                  <div className="flex items-center gap-2.5">
+                    <AlertCircle className="w-6 h-6 text-amber-500" />
+                    <p className="text-[16px] font-bold text-slate-900">Report already exists</p>
                   </div>
-                ))}
-              </div>
+                  <p className="text-[14px] text-slate-600">{result.message}</p>
+                  <button
+                    onClick={() => navigate(`/reports/${result.report_id}`)}
+                    className="w-full py-3 bg-blue-50 text-blue-700 text-[14px] font-bold rounded-xl hover:bg-blue-100 transition-all flex items-center justify-center gap-2"
+                  >
+                    View report
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2.5">
+                    <CheckCircle className="w-6 h-6 text-emerald-500" />
+                    <p className="text-[16px] font-bold text-slate-900">Synthesis Complete</p>
+                  </div>
 
-              {/* Quote check */}
-              {result.quote_check?.length > 0 && (
-                <div>
-                  <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mb-2.5">Quote Verification</p>
-                  <div className="space-y-2">
-                    {result.quote_check.map((q, i) => (
-                      <div key={i} className="flex items-start gap-2.5">
-                        <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded mt-0.5 ${q.found ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                          {q.found ? 'FOUND' : 'MISS'}
-                        </span>
-                        <span className="text-[13px] text-slate-600 leading-relaxed">{q.quote}</span>
+                  <div className="grid grid-cols-2 gap-4">
+                    {[
+                      { label: 'Report ID', value: result.call_id },
+                      { label: 'Model', value: String((result.usage as Record<string, unknown>)?.model ?? '') },
+                      { label: 'Tokens In', value: String((result.usage as Record<string, unknown>)?.input_tokens ?? 0).replace(/\B(?=(\d{3})+(?!\d))/g, ',') },
+                      { label: 'Tokens Out', value: String((result.usage as Record<string, unknown>)?.output_tokens ?? 0).replace(/\B(?=(\d{3})+(?!\d))/g, ',') },
+                    ].map(item => (
+                      <div key={item.label} className="bg-slate-50 rounded-xl p-3">
+                        <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">{item.label}</p>
+                        <p className="text-[13px] text-slate-700 font-semibold mt-1 font-mono">{item.value}</p>
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
 
-              <button
-                onClick={() => navigate(`/reports/${result.report_id}`)}
-                className="w-full py-3 bg-blue-50 text-blue-700 text-[14px] font-bold rounded-xl hover:bg-blue-100 transition-all flex items-center justify-center gap-2"
-              >
-                View Full Report
-                <ArrowRight className="w-4 h-4" />
-              </button>
+                  {/* Quote check */}
+                  {result.quote_check?.length ? (
+                    <div>
+                      <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mb-2.5">Quote Verification</p>
+                      <div className="space-y-2">
+                        {result.quote_check.map((q, i) => (
+                          <div key={i} className="flex items-start gap-2.5">
+                            <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded mt-0.5 ${q.found ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                              {q.found ? 'FOUND' : 'MISS'}
+                            </span>
+                            <span className="text-[13px] text-slate-600 leading-relaxed">{q.quote}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <button
+                    onClick={() => navigate(`/reports/${result.report_id}`)}
+                    className="w-full py-3 bg-blue-50 text-blue-700 text-[14px] font-bold rounded-xl hover:bg-blue-100 transition-all flex items-center justify-center gap-2"
+                  >
+                    View Full Report
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>

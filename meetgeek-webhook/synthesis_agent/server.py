@@ -16,7 +16,7 @@ from typing import Any
 import certifi
 from bson import ObjectId
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -338,10 +338,18 @@ async def chat_with_meeting(meeting_id: str, body: ChatReq):
 # ═══════════════ Pain Report Endpoints ═══════════════
 
 @app.get("/api/reports")
-async def list_reports():
-    """List all pain reports from DB."""
+async def list_reports(folder_id: str | None = Query(None, description="Filter by folder: only reports whose meeting is in this folder")):
+    """List pain reports, optionally filtered by folder_id (meeting's folder)."""
     db = get_db()
-    cursor = db["pain_reports"].find({}, {
+    query: dict[str, Any] = {}
+    if folder_id is not None:
+        if folder_id == "":
+            meeting_query = {"$or": [{"folder_id": {"$exists": False}}, {"folder_id": None}, {"folder_id": ""}]}
+        else:
+            meeting_query = {"folder_id": folder_id}
+        meeting_ids = [doc["meeting_id"] for doc in db["meetings"].find(meeting_query, {"meeting_id": 1})]
+        query["meeting_id"] = {"$in": meeting_ids}
+    cursor = db["pain_reports"].find(query, {
         "call_id": 1, "meeting_id": 1, "meeting_title": 1,
         "call_type": 1, "created_at": 1, "usage": 1, "_id": 1,
         "report_card.pain_validity_score": 1,
@@ -403,12 +411,22 @@ async def synthesize(req: SynthesizeReq):
     if not meeting:
         raise HTTPException(404, "Meeting not found")
 
+    title = meeting.get("title", req.meeting_id)
+    call_id = f"{req.meeting_id[:8]}-{req.call_type[:3].upper()}"
+
+    existing = db["pain_reports"].find_one({"call_id": call_id})
+    if existing:
+        return {
+            "status": "already_exists",
+            "message": f"A report for this meeting with {req.call_type} already exists. View it below or choose a different lens (e.g. Operations, Tech).",
+            "report_id": str(existing["_id"]),
+            "call_id": call_id,
+            "report": serialize(existing),
+        }
+
     transcript = extract_transcript_text(meeting)
     if not transcript.strip():
         raise HTTPException(400, "Meeting has no transcript text")
-
-    title = meeting.get("title", req.meeting_id)
-    call_id = f"{req.meeting_id[:8]}-{req.call_type[:3].upper()}"
 
     system_prompt = load_prompt("synthesis_system.txt")
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -459,14 +477,8 @@ async def synthesize(req: SynthesizeReq):
         "created_at": datetime.now(timezone.utc),
     }
 
-    existing = db["pain_reports"].find_one({"call_id": call_id})
-    if existing:
-        db["pain_reports"].replace_one({"call_id": call_id}, report_doc)
-        report_doc["_id"] = existing["_id"]
-    else:
-        result = db["pain_reports"].insert_one(report_doc)
-        report_doc["_id"] = result.inserted_id
-
+    result = db["pain_reports"].insert_one(report_doc)
+    report_doc["_id"] = result.inserted_id
     return {
         "status": "ok",
         "report_id": str(report_doc["_id"]),

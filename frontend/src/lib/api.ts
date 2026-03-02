@@ -82,8 +82,10 @@ export interface SynthResult {
   report_id: string
   call_id: string
   report: Record<string, unknown>
-  quote_check: { quote: string; found: boolean }[]
-  usage: { model: string; input_tokens: number; output_tokens: number; elapsed_seconds: number }
+  quote_check?: { quote: string; found: boolean }[]
+  usage?: { model: string; input_tokens: number; output_tokens: number; elapsed_seconds: number }
+  /** When status is "already_exists" */
+  message?: string
 }
 
 export interface DeltaResult {
@@ -141,7 +143,10 @@ export const api = {
   health: () => req<{ status: string }>('/health'),
   meetings: meetingsList,
   meeting: (id: string) => req<MeetingDetail>(`/meetings/${id}`),
-  reports: () => req<PainReportItem[]>('/reports'),
+  reports: (folderId?: string | null) => {
+    const q = folderId !== undefined && folderId !== null ? `?folder_id=${encodeURIComponent(folderId)}` : ''
+    return req<PainReportItem[]>(`/reports${q}`)
+  },
   report: (id: string) => req<Record<string, unknown>>(`/reports/${id}`),
   deleteReport: (id: string) => req<{ status: string }>(`/reports/${id}`, { method: 'DELETE' }),
   synthesize: (meetingId: string, callType: string, interviewer: string) =>

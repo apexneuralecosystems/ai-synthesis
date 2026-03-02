@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
-import type { Meeting, MeetingImportPayload, Folder } from '../lib/api'
-import { Search, Calendar, Clock, Users, ChevronRight, Inbox, Mic, Upload, Trash2, FolderPlus, FolderOpen, Folder as FolderIcon, MoreVertical, FolderMinus } from 'lucide-react'
+import type { Meeting, MeetingImportPayload } from '../lib/api'
+import { useMeetings } from '../context/MeetingsContext'
+import { Search, Calendar, Clock, Users, ChevronRight, Inbox, Mic, Upload, Trash2, Folder as FolderIcon, MoreVertical, FolderMinus } from 'lucide-react'
 
 /** Prefer ISO for parsing; backend sends date_ist (e.g. "26 Feb 2025, 10:30 AM IST") and date_iso (parseable) */
 function getMeetingDateForParse(m: Meeting): string {
@@ -60,11 +61,11 @@ function parseDateInput(s: string): number | null {
   return Number.isNaN(t) ? null : t
 }
 
-/** selectedFolderId: null = All, '' = No folder, string = folder id */
 export default function Meetings() {
+  const ctx = useMeetings()
+  const selectedFolderId = ctx?.selectedFolderId ?? null
+  const folders = ctx?.folders ?? []
   const [meetings, setMeetings] = useState<Meeting[]>([])
-  const [folders, setFolders] = useState<Folder[]>([])
-  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [dateFrom, _setDateFrom] = useState('')
   const [dateTo, _setDateTo] = useState('')
@@ -73,18 +74,8 @@ export default function Meetings() {
   const [uploading, setUploading] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [_movingId, setMovingId] = useState<string | null>(null)
-  const [newFolderName, setNewFolderName] = useState('')
-  const [creatingFolder, setCreatingFolder] = useState(false)
   const [openMoveId, setOpenMoveId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
-
-  function loadFolders() {
-    api.foldersList().then(setFolders).catch(() => setFolders([]))
-  }
-
-  useEffect(() => {
-    loadFolders()
-  }, [])
 
   useEffect(() => {
     setLoading(true)
@@ -138,41 +129,6 @@ export default function Meetings() {
       setError(msg)
     } finally {
       setMovingId(null)
-    }
-  }
-
-  async function handleCreateFolder() {
-    const name = newFolderName.trim()
-    if (!name) return
-    setCreatingFolder(true)
-    try {
-      const folder = await api.folderCreate(name)
-      setFolders(prev => [...prev, folder])
-      setNewFolderName('')
-      setSelectedFolderId(folder.id)
-      api.meetingsAll(folder.id).then(setMeetings)
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to create folder'
-      setError(msg)
-    } finally {
-      setCreatingFolder(false)
-    }
-  }
-
-  async function handleDeleteFolder(folderId: string, e: React.MouseEvent) {
-    e.preventDefault()
-    e.stopPropagation()
-    if (!confirm('Delete this folder? Meetings inside will be moved to "No folder".')) return
-    try {
-      await api.folderDelete(folderId)
-      setFolders(prev => prev.filter(f => f.id !== folderId))
-      if (selectedFolderId === folderId) {
-        setSelectedFolderId(null)
-        api.meetingsAll().then(setMeetings)
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to delete folder'
-      setError(msg)
     }
   }
 
@@ -232,105 +188,8 @@ export default function Meetings() {
     return f?.name ?? 'Unknown'
   }
 
-  // Sidebar counts: when viewing All we have full list; when viewing a folder we show count only for selected
-  const noFolderCount = selectedFolderId === null ? meetings.filter(m => !m.folder_id).length : 0
-  const folderCount = (fid: string) => selectedFolderId === null ? meetings.filter(m => m.folder_id === fid).length : 0
-
   return (
-    <div className="flex flex-col sm:flex-row gap-6 lg:gap-8">
-      {/* Left sidebar: Folders - always rendered first, stays on the left from sm breakpoint */}
-      <aside className="sm:w-52 lg:w-56 flex-shrink-0 order-first">
-        <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden sm:sticky sm:top-6">
-          <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50">
-            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
-              <FolderOpen className="w-4 h-4 text-slate-400" />
-              Folders
-            </h2>
-          </div>
-          <nav className="p-2">
-            <button
-              type="button"
-              onClick={() => setSelectedFolderId(null)}
-              className={`w-full inline-flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
-                selectedFolderId === null ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              <span className="inline-flex items-center gap-2.5 min-w-0">
-                <FolderOpen className="w-4 h-4 flex-shrink-0" />
-                <span className="truncate">All meetings</span>
-              </span>
-              {selectedFolderId === null && <span className="flex-shrink-0 text-slate-400 tabular-nums">{meetings.length}</span>}
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedFolderId('')}
-              className={`w-full inline-flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
-                selectedFolderId === '' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              <span className="inline-flex items-center gap-2.5 min-w-0">
-                <FolderMinus className="w-4 h-4 flex-shrink-0" />
-                <span className="truncate">No folder</span>
-              </span>
-              {(selectedFolderId === '' || selectedFolderId === null) && <span className="flex-shrink-0 text-slate-400 tabular-nums">{selectedFolderId === '' ? meetings.length : noFolderCount}</span>}
-            </button>
-            {folders.length > 0 && (
-              <div className="mt-2 pt-2 border-t border-slate-100">
-                <p className="px-3 py-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wide">My folders</p>
-                {folders.map(f => (
-                  <div key={f.id} className="flex items-center group">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedFolderId(f.id)}
-                      className={`flex-1 min-w-0 inline-flex items-center justify-between gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors text-left ${
-                        selectedFolderId === f.id ? 'bg-amber-50 text-amber-800' : 'text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      <span className="inline-flex items-center gap-2.5 min-w-0 truncate">
-                        <FolderIcon className="w-4 h-4 flex-shrink-0 text-amber-500" />
-                        <span className="truncate">{f.name}</span>
-                      </span>
-                      {(selectedFolderId === f.id || selectedFolderId === null) && <span className="flex-shrink-0 text-slate-400 tabular-nums text-xs">{selectedFolderId === f.id ? meetings.length : folderCount(f.id)}</span>}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => handleDeleteFolder(f.id, e)}
-                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                      title="Delete folder"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </nav>
-          <div className="p-2 border-t border-slate-100 bg-slate-50/30">
-            <div className="flex gap-2 rounded-xl border border-dashed border-slate-200 bg-white px-2 py-2">
-              <input
-                type="text"
-                value={newFolderName}
-                onChange={e => setNewFolderName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleCreateFolder()}
-                placeholder="New folder..."
-                className="flex-1 min-w-0 text-sm border-0 bg-transparent focus:outline-none placeholder:text-slate-400"
-              />
-              <button
-                type="button"
-                onClick={handleCreateFolder}
-                disabled={!newFolderName.trim() || creatingFolder}
-                className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-                title="Create folder"
-              >
-                <FolderPlus className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      {/* Main: Header, Search, Stats, List */}
-      <div className="flex-1 min-w-0">
+    <div>
       {/* Page Header */}
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
@@ -525,7 +384,6 @@ export default function Meetings() {
           ))}
         </div>
       )}
-      </div>
     </div>
   )
 }

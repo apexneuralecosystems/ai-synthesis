@@ -1,7 +1,9 @@
 """
 ApexNeural Agent Factory - AI Synthesis Backend.
-GPT-4o engine. MongoDB for meetings, reports, and delta analyses.p
+GPT-4o engine. MongoDB for meetings, reports, and delta analyses.
 """ 
+import csv
+import io
 import json
 import logging
 import os
@@ -9,6 +11,7 @@ import random
 import re
 import sys
 import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -16,7 +19,7 @@ from typing import Any
 import certifi
 from bson import ObjectId
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -29,16 +32,24 @@ _base = Path(__file__).resolve().parent.parent
 if str(_base) not in sys.path:
     sys.path.insert(0, str(_base))
 
+BASE_DIR = Path(__file__).resolve().parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
 from api import router as api_router
 from database import init_db, get_database, sync_auto_folders_by_title
 from webhook import router as webhook_router
+from schemas.llm_models import validate_pain_report_response, validate_delta_report_response
 
-BASE_DIR = Path(__file__).resolve().parent
 PROMPTS_DIR = BASE_DIR / "prompts"
 SCHEMAS_DIR = BASE_DIR / "schemas"
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
+# OpenRouter: env var openrouter_api_key (or OPENROUTER_API_KEY); model anthropic/claude-opus-4.6 only
+OPENROUTER_API_KEY = (
+    os.environ.get("openrouter_api_key") or os.environ.get("OPENROUTER_API_KEY") or ""
+)
+OPENROUTER_OPUS_MODEL = "anthropic/claude-opus-4.6"
 MONGODB_URI = os.environ.get("MONGODB_URI", "")
 MONGODB_DB = os.environ.get("MONGODB_DB_NAME", "meetgeek")
 # Use TLS CA only for mongodb+srv (Atlas). Plain mongodb:// (e.g. internal) uses no TLS by default.
@@ -129,12 +140,12 @@ def serialize(doc: dict) -> dict:
     return out
 
 
-# ═══════════════ LLM (OpenRouter Anthropic primary, OpenAI fallback) ═══════════════
+# ═══════════════ LLM (OpenRouter Anthropic Opus 4.6 primary, OpenAI fallback) ═══════════════
 
 def call_gpt4o(system_prompt: str, user_message: str) -> tuple[str, dict]:
     """
-    Call Anthropic Opus via OpenRouter if configured, otherwise fall back to OpenAI GPT-4o.
-    Returns (text, usage).
+    Use OpenRouter with Anthropic Opus 4.6 only; fall back to OpenAI GPT-4o if OpenRouter
+    is unset or fails. Returns (text, usage).
     """
     import openai
 
@@ -143,42 +154,45 @@ def call_gpt4o(system_prompt: str, user_message: str) -> tuple[str, dict]:
         {"role": "user", "content": user_message},
     ]
 
-    # Primary: Anthropic Opus 4.6 via OpenRouter (OpenAI-compatible API)
-    if OPENROUTER_API_KEY:
+    # Primary: OpenRouter with Anthropic Opus 4.6 only
+    if OPENROUTER_API_KEY.strip():
         try:
             client = openai.OpenAI(
-                api_key=OPENROUTER_API_KEY,
+                api_key=OPENROUTER_API_KEY.strip(),
                 base_url="https://openrouter.ai/api/v1",
             )
             start = time.time()
             resp = client.chat.completions.create(
-                model="anthropic/claude-opus-4.6",
+                model=OPENROUTER_OPUS_MODEL,
                 messages=messages,
                 temperature=0.2,
             )
             elapsed = time.time() - start
             text = resp.choices[0].message.content or ""
             usage = {
-                "model": "anthropic/claude-opus-4.6",
+                "model": OPENROUTER_OPUS_MODEL,
                 "input_tokens": resp.usage.prompt_tokens,
                 "output_tokens": resp.usage.completion_tokens,
                 "elapsed_seconds": round(elapsed, 2),
             }
             logger.info(
-                "OpenRouter Anthropic Opus: %d in / %d out, %.1fs",
+                "OpenRouter %s: %d in / %d out, %.1fs",
+                OPENROUTER_OPUS_MODEL,
                 usage["input_tokens"],
                 usage["output_tokens"],
                 elapsed,
             )
             return text, usage
         except Exception as e:
-            logger.warning("OpenRouter Anthropic failed, falling back to OpenAI GPT-4o: %s", e)
+            logger.warning("OpenRouter failed, falling back to OpenAI: %s", e)
 
     # Fallback: OpenAI GPT-4o
-    if not OPENAI_API_KEY:
-        raise HTTPException(500, "OPENROUTER_API_KEY or OPENAI_API_KEY must be set")
-
-    client = openai.OpenAI(api_key=OPENAI_API_KEY)
+    if not (OPENAI_API_KEY or "").strip():
+        raise HTTPException(
+            500,
+            "OpenRouter (OPENROUTER_API_KEY or openrouter_api_key) or OpenAI (OPENAI_API_KEY) must be set",
+        )
+    client = openai.OpenAI(api_key=OPENAI_API_KEY.strip())
     start = time.time()
     resp = client.chat.completions.create(
         model="gpt-4o",
@@ -193,7 +207,7 @@ def call_gpt4o(system_prompt: str, user_message: str) -> tuple[str, dict]:
         "output_tokens": resp.usage.completion_tokens,
         "elapsed_seconds": round(elapsed, 2),
     }
-    logger.info("GPT-4o fallback: %d in / %d out, %.1fs", usage["input_tokens"], usage["output_tokens"], elapsed)
+    logger.info("OpenAI gpt-4o fallback: %d in / %d out, %.1fs", usage["input_tokens"], usage["output_tokens"], elapsed)
     return text, usage
 
 
@@ -243,6 +257,79 @@ def spot_check_quotes(report: dict, transcript: str) -> list[dict]:
     return [{"quote": q[:100], "found": q.lower() in t_lower} for q in sample]
 
 
+def survey_data_to_text(csv_text: str) -> str:
+    """Parse CSV text into a readable block for the LLM (headers + rows)."""
+    if not (csv_text or "").strip():
+        return ""
+    buf = io.StringIO(csv_text.strip())
+    try:
+        reader = csv.reader(buf)
+        rows = list(reader)
+    except Exception:
+        return csv_text
+    if not rows:
+        return csv_text
+    # Format as header line + data rows
+    lines = ["\t".join(str(c) for c in rows[0])]
+    for r in rows[1:]:
+        lines.append("\t".join(str(c) for c in r))
+    return "\n".join(lines)
+
+
+def survey_data_from_file(content: bytes, filename: str) -> str:
+    """Parse uploaded CSV or Excel file into a text block for the LLM."""
+    name = (filename or "").lower()
+    if name.endswith(".xlsx") or name.endswith(".xls"):
+        try:
+            import openpyxl
+            wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+            ws = wb.active
+            rows = []
+            for row in ws.iter_rows(values_only=True):
+                rows.append([str(c) if c is not None else "" for c in row])
+            wb.close()
+            if not rows:
+                return ""
+            lines = ["\t".join(rows[0])]
+            for r in rows[1:]:
+                lines.append("\t".join(r))
+            return "\n".join(lines)
+        except Exception as e:
+            logger.warning("Excel parse failed: %s", e)
+            raise HTTPException(400, f"Invalid Excel file: {e}") from e
+    # CSV (or default)
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = content.decode("latin-1")
+    return survey_data_to_text(text)
+
+
+def extract_text_from_doc(content: bytes, filename: str) -> str:
+    """Extract plain text from .docx (and optionally .doc) for synthesis. Returns empty string on failure."""
+    name = (filename or "").lower()
+    if name.endswith(".docx"):
+        try:
+            from docx import Document
+            doc = Document(io.BytesIO(content))
+            parts = []
+            for para in doc.paragraphs:
+                if para.text.strip():
+                    parts.append(para.text)
+            for table in doc.tables:
+                for row in table.rows:
+                    cells = [c.text.strip() for c in row.cells if c.text.strip()]
+                    if cells:
+                        parts.append(" | ".join(cells))
+            return "\n\n".join(parts) if parts else ""
+        except Exception as e:
+            logger.warning("Docx extract failed: %s", e)
+            raise HTTPException(400, f"Could not read DOCX: {e}") from e
+    if name.endswith(".doc"):
+        raise HTTPException(400, "Legacy .doc format is not supported. Please upload .docx or paste the text.")
+    return ""
+
+
 # ═══════════════ Pydantic Models ═══════════════
 
 class SynthesizeReq(BaseModel):
@@ -288,8 +375,8 @@ async def startup():
 async def health():
     return {
         "status": "ok",
-        "llm": "gpt-4o",
-        "api_key_set": bool(OPENAI_API_KEY),
+        "llm": OPENROUTER_OPUS_MODEL if OPENROUTER_API_KEY.strip() else "gpt-4o",
+        "api_key_set": bool(OPENROUTER_API_KEY.strip() or (OPENAI_API_KEY or "").strip()),
     }
 
 
@@ -524,24 +611,26 @@ async def synthesize(req: SynthesizeReq):
     except Exception as e:
         raise HTTPException(500, str(e))
 
-    # Auto-repair schema errors
-    try:
-        import jsonschema
-        schema = json.loads((SCHEMAS_DIR / "pain_report_card.json").read_text(encoding="utf-8"))
-        errors = list(jsonschema.Draft7Validator(schema).iter_errors(data))
-        if errors:
-            repair_msg = (
-                "Fix ALL schema errors, return ONLY corrected JSON.\n\nERRORS:\n"
-                + "\n".join(f"- {e.message}" for e in errors[:10]) + "\n\n"
-                f"JSON:\n{json.dumps(data, indent=2)}"
-            )
+    # Validate with Pydantic; repair with LLM if validation fails (clearer errors for better repair)
+    data, validation_errors = validate_pain_report_response(data)
+    if validation_errors:
+        repair_msg = (
+            "Fix ALL validation errors below. Return ONLY the corrected JSON object, no other text.\n\nERRORS:\n"
+            + "\n".join(f"- {e}" for e in validation_errors[:15]) + "\n\n"
+            f"CURRENT JSON:\n{json.dumps(data, indent=2)}"
+        )
+        try:
             text2, usage2 = call_gpt4o(system_prompt, repair_msg)
             data = parse_json_response(text2)
-            usage["input_tokens"] += usage2["input_tokens"]
-            usage["output_tokens"] += usage2["output_tokens"]
-            usage["elapsed_seconds"] += usage2["elapsed_seconds"]
-    except Exception:
-        pass
+            data, validation_errors2 = validate_pain_report_response(data)
+            if not validation_errors2:
+                usage["input_tokens"] += usage2["input_tokens"]
+                usage["output_tokens"] += usage2["output_tokens"]
+                usage["elapsed_seconds"] += usage2.get("elapsed_seconds", 0)
+            else:
+                logger.warning("Pydantic validation still failed after repair: %s", validation_errors2[:5])
+        except Exception as repair_err:
+            logger.warning("Repair step failed: %s", repair_err)
 
     quotes = spot_check_quotes(data, transcript)
 
@@ -565,6 +654,211 @@ async def synthesize(req: SynthesizeReq):
         "call_id": call_id,
         "report": serialize(report_doc),
         "quote_check": quotes,
+        "usage": usage,
+    }
+
+
+@app.post("/api/synthesize/doc")
+async def synthesize_doc(
+    file: UploadFile | None = File(None),
+    doc_text: str | None = Form(None),
+    call_type: str = Form(...),
+    interviewer: str = Form("Anshul Jain"),
+    title: str | None = Form(None),
+):
+    """
+    Synthesize a document (DOCX or pasted text) into a Pain Report Card using the same CEO/Operations/Tech prompt.
+    Supply either: uploaded .docx file or doc_text (pasted). call_type must be CEO, Operations, or Tech.
+    """
+    if call_type not in VALID_CALL_TYPES:
+        raise HTTPException(400, f"call_type must be one of {VALID_CALL_TYPES}")
+
+    transcript = ""
+    doc_title = (title or "").strip() or "Uploaded document"
+    if file and file.filename:
+        content = await file.read()
+        if content:
+            transcript = extract_text_from_doc(content, file.filename)
+            if not doc_title or doc_title == "Uploaded document":
+                doc_title = file.filename
+    if not transcript and doc_text and doc_text.strip():
+        transcript = doc_text.strip()
+    if not transcript:
+        raise HTTPException(
+            400,
+            "Provide either an uploaded .docx file or paste text in doc_text.",
+        )
+
+    call_id = f"doc-{uuid.uuid4().hex[:8]}-{call_type[:3].upper()}"
+    db = get_db()
+    existing = db["pain_reports"].find_one({"call_id": call_id, **_not_deleted_filter()})
+    if existing:
+        return {
+            "status": "already_exists",
+            "message": "A report for this document already exists.",
+            "report_id": str(existing["_id"]),
+            "call_id": call_id,
+            "report": serialize(existing),
+        }
+
+    system_prompt = load_prompt("synthesis_system.txt")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    user_msg = (
+        f"CALL TYPE: {call_type}\nCALL ID: {call_id}\nDATE: {today}\n"
+        f"INTERVIEWER: {interviewer}\nTRANSCRIPT FILE: {doc_title}\n\n"
+        f"--- TRANSCRIPT START ---\n{transcript}\n--- TRANSCRIPT END ---"
+    )
+
+    try:
+        text, usage = call_gpt4o(system_prompt, user_msg)
+        data = parse_json_response(text)
+    except json.JSONDecodeError:
+        raise HTTPException(500, "LLM returned invalid JSON")
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+    data, validation_errors = validate_pain_report_response(data)
+    if validation_errors:
+        repair_msg = (
+            "Fix ALL validation errors below. Return ONLY the corrected JSON object, no other text.\n\nERRORS:\n"
+            + "\n".join(f"- {e}" for e in validation_errors[:15]) + "\n\n"
+            f"CURRENT JSON:\n{json.dumps(data, indent=2)}"
+        )
+        try:
+            text2, usage2 = call_gpt4o(system_prompt, repair_msg)
+            data = parse_json_response(text2)
+            data, validation_errors2 = validate_pain_report_response(data)
+            if not validation_errors2:
+                usage["input_tokens"] += usage2["input_tokens"]
+                usage["output_tokens"] += usage2["output_tokens"]
+                usage["elapsed_seconds"] += usage2.get("elapsed_seconds", 0)
+            else:
+                logger.warning("Pydantic validation still failed after repair (doc): %s", validation_errors2[:5])
+        except Exception as repair_err:
+            logger.warning("Repair step failed (doc): %s", repair_err)
+
+    quotes = spot_check_quotes(data, transcript)
+
+    report_doc = {
+        "call_id": call_id,
+        "meeting_id": "doc",
+        "meeting_title": doc_title,
+        "call_type": call_type,
+        "interviewer": interviewer,
+        "report_card": data.get("report_card", data),
+        "quote_check": quotes,
+        "usage": usage,
+        "created_at": datetime.now(timezone.utc),
+    }
+    result = db["pain_reports"].insert_one(report_doc)
+    report_doc["_id"] = result.inserted_id
+    return {
+        "status": "ok",
+        "report_id": str(report_doc["_id"]),
+        "call_id": call_id,
+        "report": serialize(report_doc),
+        "quote_check": quotes,
+        "usage": usage,
+    }
+
+
+# ═══════════════ WhatsApp Survey Synthesis ═══════════════
+
+@app.post("/api/survey/synthesize")
+async def survey_synthesize(
+    file: UploadFile | None = File(None),
+    csv_text: str | None = Form(None),
+):
+    """
+    Synthesize WhatsApp survey data (CSV or Excel) into one Pain Report Card.
+    Supply either: uploaded file (CSV/Excel) or csv_text (pasted CSV). Stored in pain_reports with call_type Survey.
+    """
+    survey_content = ""
+    if file and file.filename:
+        content = await file.read()
+        if content:
+            survey_content = survey_data_from_file(content, file.filename)
+    if not survey_content and csv_text and csv_text.strip():
+        survey_content = survey_data_to_text(csv_text.strip())
+    if not survey_content:
+        raise HTTPException(
+            400,
+            "Provide either an uploaded file (CSV or Excel) or paste CSV in csv_text.",
+        )
+
+    call_id = f"survey-{uuid.uuid4().hex[:8]}"
+    db = get_db()
+    existing = db["pain_reports"].find_one({"call_id": call_id, **_not_deleted_filter()})
+    if existing:
+        return {
+            "status": "already_exists",
+            "report_id": str(existing["_id"]),
+            "call_id": call_id,
+            "report": serialize(existing),
+        }
+
+    system_prompt = load_prompt("whatsapp_survey_system.txt")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    user_msg = (
+        f"CALL ID: {call_id}\nDATE: {today}\nSOURCE: WhatsApp Survey (CSV/Excel)\n\n"
+        f"--- SURVEY DATA START ---\n{survey_content}\n--- SURVEY DATA END ---"
+    )
+
+    try:
+        text, usage = call_gpt4o(system_prompt, user_msg)
+        data = parse_json_response(text)
+    except json.JSONDecodeError:
+        raise HTTPException(500, "LLM returned invalid JSON")
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+    data, validation_errors = validate_pain_report_response(data)
+    report_card = data.get("report_card", data)
+    meta = report_card.get("meta", {})
+    meta["call_type"] = "Survey"
+    meta["call_id"] = call_id
+    report_card["meta"] = meta
+    data["report_card"] = report_card
+
+    if validation_errors:
+        repair_msg = (
+            "Fix ALL validation errors below. Return ONLY the corrected JSON object. Keep meta.call_type as 'Survey'.\n\nERRORS:\n"
+            + "\n".join(f"- {e}" for e in validation_errors[:15]) + "\n\n"
+            f"CURRENT JSON:\n{json.dumps(data, indent=2)}"
+        )
+        try:
+            text2, usage2 = call_gpt4o(system_prompt, repair_msg)
+            data = parse_json_response(text2)
+            data, validation_errors2 = validate_pain_report_response(data)
+            if not validation_errors2:
+                usage["input_tokens"] += usage2["input_tokens"]
+                usage["output_tokens"] += usage2["output_tokens"]
+                usage["elapsed_seconds"] += usage2.get("elapsed_seconds", 0)
+            report_card = data.get("report_card", data)
+            meta = report_card.setdefault("meta", {})
+            meta["call_type"] = "Survey"
+            meta["call_id"] = call_id
+            data["report_card"] = report_card
+        except Exception as repair_err:
+            logger.warning("Survey repair step failed: %s", repair_err)
+
+    report_doc = {
+        "call_id": call_id,
+        "meeting_id": "survey",
+        "meeting_title": "WhatsApp Survey",
+        "call_type": "Survey",
+        "interviewer": "Survey",
+        "report_card": data.get("report_card", data),
+        "usage": usage,
+        "created_at": datetime.now(timezone.utc),
+    }
+    result = db["pain_reports"].insert_one(report_doc)
+    report_doc["_id"] = result.inserted_id
+    return {
+        "status": "ok",
+        "report_id": str(report_doc["_id"]),
+        "call_id": call_id,
+        "report": serialize(report_doc),
         "usage": usage,
     }
 
@@ -701,6 +995,26 @@ async def run_delta(req: DeltaReq):
         raise HTTPException(500, "LLM returned invalid JSON for delta")
     except Exception as e:
         raise HTTPException(500, str(e))
+
+    delta, delta_validation_errors = validate_delta_report_response(delta)
+    if delta_validation_errors:
+        repair_msg = (
+            "Fix ALL validation errors below. Return ONLY the corrected JSON object with key 'delta_report'.\n\nERRORS:\n"
+            + "\n".join(f"- {e}" for e in delta_validation_errors[:15]) + "\n\n"
+            f"CURRENT JSON:\n{json.dumps(delta, indent=2)}"
+        )
+        try:
+            text2, usage2 = call_gpt4o(system_prompt, repair_msg)
+            delta = parse_json_response(text2)
+            delta, delta_validation_errors2 = validate_delta_report_response(delta)
+            if not delta_validation_errors2:
+                usage["input_tokens"] += usage2["input_tokens"]
+                usage["output_tokens"] += usage2["output_tokens"]
+                usage["elapsed_seconds"] += usage2.get("elapsed_seconds", 0)
+            else:
+                logger.warning("Delta Pydantic validation still failed after repair: %s", delta_validation_errors2[:5])
+        except Exception as repair_err:
+            logger.warning("Delta repair step failed: %s", repair_err)
 
     delta_doc = {
         "source_report_ids": req.report_ids,

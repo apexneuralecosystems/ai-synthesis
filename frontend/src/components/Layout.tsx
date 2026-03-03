@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react'
 import { useState, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Mic, FileText, GitCompare, FlaskConical, PanelLeftClose, PanelLeft, Zap, FolderOpen, FolderMinus, Folder as FolderIcon, FolderPlus, Trash2, Search } from 'lucide-react'
+import { Mic, FileText, GitCompare, FlaskConical, PanelLeftClose, PanelLeft, Zap, FolderOpen, FolderMinus, Folder as FolderIcon, FolderPlus, Trash2, Search, MessageCircle } from 'lucide-react'
 import { useMeetings } from '../context/MeetingsContext'
 
 const NAV = [
   { to: '/', label: 'Meetings', icon: Mic, desc: 'View all calls' },
   { to: '/synthesis', label: 'Synthesis', icon: FlaskConical, desc: 'Generate reports' },
+  { to: '/survey', label: 'WhatsApp Survey', icon: MessageCircle, desc: 'CSV/Excel → report' },
   { to: '/reports', label: 'Reports', icon: FileText, desc: 'Pain report cards' },
   { to: '/delta', label: 'Delta Analysis', icon: GitCompare, desc: 'Compare sessions' },
 ]

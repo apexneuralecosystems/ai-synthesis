@@ -174,6 +174,45 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ meeting_id: meetingId, call_type: callType, interviewer }),
     }),
+  /** WhatsApp survey: CSV/Excel file or pasted csv_text. Returns same shape as synthesize. */
+  surveySynthesize: async (file?: File | null, csvText?: string | null): Promise<SynthResult> => {
+    const form = new FormData()
+    if (file) form.append('file', file)
+    if (csvText?.trim()) form.append('csv_text', csvText.trim())
+    const res = await fetch(`${BASE}/survey/synthesize`, {
+      method: 'POST',
+      body: form,
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: res.statusText }))
+      throw new Error(body.detail || `HTTP ${res.status}`)
+    }
+    return res.json()
+  },
+  /** CEO/Operations/Tech synthesis from document: .docx file or pasted text. */
+  synthesizeDoc: async (
+    callType: string,
+    interviewer: string,
+    file?: File | null,
+    docText?: string | null,
+    title?: string | null,
+  ): Promise<SynthResult> => {
+    const form = new FormData()
+    form.append('call_type', callType)
+    form.append('interviewer', interviewer)
+    if (file) form.append('file', file)
+    if (docText?.trim()) form.append('doc_text', docText.trim())
+    if (title?.trim()) form.append('title', title.trim())
+    const res = await fetch(`${BASE}/synthesize/doc`, {
+      method: 'POST',
+      body: form,
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: res.statusText }))
+      throw new Error(body.detail || `HTTP ${res.status}`)
+    }
+    return res.json()
+  },
   deltas: () => req<DeltaItem[]>('/deltas'),
   delta: (id: string) => req<Record<string, unknown>>(`/deltas/${id}`),
   deleteDelta: (id: string) => req<{ status: string }>(`/deltas/${id}`, { method: 'DELETE' }),

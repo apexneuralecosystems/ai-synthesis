@@ -214,6 +214,12 @@ def _format_duration(seconds: int | None) -> str | None:
 
 def _meeting_to_item(m: dict) -> MeetingItem:
     transcript = m.get("transcript") or ""
+    sentences = m.get("transcript_sentences") or []
+    if not transcript and sentences:
+        transcript = " ".join(
+            (s.get("text") or "").strip() for s in sentences if isinstance(s, dict)
+        )
+    has_any = bool(transcript.strip()) or bool(sentences)
     preview = transcript[:200].strip() + ("..." if len(transcript) > 200 else "") if transcript else None
     return MeetingItem(
         meeting_id=m["meeting_id"],
@@ -225,7 +231,7 @@ def _meeting_to_item(m: dict) -> MeetingItem:
         participants=m.get("participants"),
         host_email=m.get("host_email"),
         source=m.get("source"),
-        has_transcript=bool(transcript),
+        has_transcript=has_any,
         transcript_preview=preview,
         ai_processed=m.get("processed", False),
         created_at_ist=_to_ist(m.get("created_at")),

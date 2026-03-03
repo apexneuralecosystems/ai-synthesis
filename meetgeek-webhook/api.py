@@ -33,6 +33,7 @@ from database import (
     soft_delete_folder,
     restore_folder,
     list_trashed_folders,
+    sync_auto_folders_by_title,
 )
 from webhook import sync_meeting_to_mongodb
 
@@ -717,6 +718,13 @@ async def create_folder_api(
     """Create a new folder."""
     folder = await create_folder(db, body.name)
     return _folder_to_item(folder)
+
+
+@router.post("/folders/sync-by-title", status_code=200)
+async def sync_folders_by_title_api(db: AsyncIOMotorDatabase = Depends(get_db)):
+    """Group meetings by normalized title; for each title with 2+ meetings, create a folder and assign them."""
+    await sync_auto_folders_by_title(db)
+    return {"status": "ok", "message": "Folders synced by meeting title."}
 
 
 @router.delete("/folders/{folder_id}", status_code=204)

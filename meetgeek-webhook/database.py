@@ -143,6 +143,7 @@ async def save_meeting(db: AsyncIOMotorDatabase, meeting_data: dict[str, Any]) -
         doc["updated_at"] = now
         await coll.insert_one(doc)
     out = await coll.find_one({"meeting_id": mid})
+    await sync_auto_folders_by_title(db)
     return _doc_to_meeting(out)
 
 
@@ -302,6 +303,46 @@ async def delete_meeting(db: AsyncIOMotorDatabase, meeting_id: str) -> bool:
 def _folder_not_deleted_filter() -> dict[str, Any]:
     """Exclude soft-deleted (trashed) folders."""
     return {"$or": [{"deleted_at": {"$exists": False}}, {"deleted_at": None}]}
+
+
+def _normalize_title(title: str | None) -> str:
+    """Normalize meeting title for grouping: strip, lowercase, collapse spaces."""
+    return " ".join((title or "").strip().lower().split()) or ""
+
+
+async def get_folder_by_name(db: AsyncIOMotorDatabase, name: str) -> dict[str, Any] | None:
+    """Return the first non-trashed folder with the given name, or None."""
+    doc = await db["folders"].find_one(
+        {"name": (name or "").strip(), **_folder_not_deleted_filter()}
+    )
+    if not doc:
+        return None
+    return {"id": doc["id"], "name": doc["name"], "created_at": doc.get("created_at")}
+
+
+async def sync_auto_folders_by_title(db: AsyncIOMotorDatabase) -> None:
+    """
+    Group non-trashed meetings by normalized title. For each title with 2+ meetings,
+    ensure a folder exists (by that name) and set folder_id on all those meetings.
+    """
+    coll = db["meetings"]
+    groups: dict[str, list[str]] = {}
+    cursor = coll.find(_not_deleted_filter(), {"meeting_id": 1, "title": 1})
+    async for doc in cursor:
+        norm = _normalize_title(doc.get("title"))
+        if norm not in groups:
+            groups[norm] = []
+        groups[norm].append(doc["meeting_id"])
+    for norm, meeting_ids in groups.items():
+        if len(meeting_ids) < 2:
+            continue
+        folder = await get_folder_by_name(db, norm)
+        if not folder:
+            folder = await create_folder(db, norm)
+        await coll.update_many(
+            {"meeting_id": {"$in": meeting_ids}},
+            {"$set": {"folder_id": folder["id"], "updated_at": _now()}},
+        )
 
 
 async def create_folder(db: AsyncIOMotorDatabase, name: str) -> dict[str, Any]:

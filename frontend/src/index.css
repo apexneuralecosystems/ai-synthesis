@@ -146,6 +146,8 @@ body {
 @media print {
   body {
     background: #ffffff !important;
+    height: auto !important;
+    overflow: visible !important;
   }
   .app-shell {
     background: #ffffff !important;
@@ -155,6 +157,8 @@ body {
   }
   .app-shell main {
     margin: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
   }
   .app-shell main > div {
     max-width: 100% !important;

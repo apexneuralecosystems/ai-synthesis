@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import {
-  ArrowLeft, AlertTriangle, Users, Database, ShieldCheck, Quote,
+  ArrowLeft, AlertTriangle, Users, Database, ShieldCheck, Quote, Download,
   Server, HelpCircle, Lightbulb, ListChecks, Clock, User,
   DollarSign, TrendingUp, BarChart3, CheckCircle2, XCircle, Sparkles,
 } from 'lucide-react'
@@ -85,13 +85,23 @@ export default function ReportDetail() {
 
   return (
     <div className="space-y-7">
-      <Link
-        to="/reports"
-        className="inline-flex items-center gap-2 text-[13px] font-semibold text-slate-500 hover:text-blue-600 transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        All Reports
-      </Link>
+      <div className="flex items-center justify-between gap-4">
+        <Link
+          to="/reports"
+          className="inline-flex items-center gap-2 text-[13px] font-semibold text-slate-500 hover:text-blue-600 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          All Reports
+        </Link>
+        <button
+          type="button"
+          onClick={() => window.print()}
+          className="inline-flex items-center gap-2 rounded-xl bg-slate-900 text-white text-[12px] font-semibold px-3.5 py-2 shadow-sm hover:bg-slate-800"
+        >
+          <Download className="w-4 h-4" />
+          Download PDF
+        </button>
+      </div>
 
       {/* HEADER */}
       <div className="bg-white border border-slate-200/80 rounded-3xl p-8 shadow-sm">

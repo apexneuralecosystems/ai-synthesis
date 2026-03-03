@@ -67,8 +67,8 @@ export default function Meetings() {
   const folders = ctx?.folders ?? []
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [search, setSearch] = useState('')
-  const [dateFrom, _setDateFrom] = useState('')
-  const [dateTo, _setDateTo] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -330,16 +330,39 @@ export default function Meetings() {
         </div>
       )}
 
-      {/* Search */}
-      <div className="relative mb-6">
-        <Search className="w-[18px] h-[18px] absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input
-          type="text"
-          placeholder="Search by title or host email..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="w-full pl-11 pr-5 py-3 text-[15px] border border-slate-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400 transition-all placeholder:text-slate-400"
-        />
+      {/* Search + Date range */}
+      <div className="mb-6 flex flex-col md:flex-row md:items-center md:gap-4">
+        <div className="relative flex-1 mb-3 md:mb-0">
+          <Search className="w-[18px] h-[18px] absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search by title, host email, or participant..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full pl-11 pr-5 py-3 text-[15px] border border-slate-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400 transition-all placeholder:text-slate-400"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Calendar className="w-[16px] h-[16px] absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={e => setDateFrom(e.target.value)}
+              className="pl-9 pr-3 py-2.5 text-[13px] border border-slate-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400 text-slate-700"
+            />
+          </div>
+          <span className="text-[11px] text-slate-400 font-medium">to</span>
+          <div className="relative">
+            <Calendar className="w-[16px] h-[16px] absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              type="date"
+              value={dateTo}
+              onChange={e => setDateTo(e.target.value)}
+              className="pl-9 pr-3 py-2.5 text-[13px] border border-slate-200 rounded-xl bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400 text-slate-700"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Stats row */}

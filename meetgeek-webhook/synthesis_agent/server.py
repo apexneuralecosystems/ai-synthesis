@@ -774,10 +774,14 @@ async def survey_synthesize(
     Supply either: uploaded file (CSV/Excel) or csv_text (pasted CSV). Stored in pain_reports with call_type Survey.
     """
     survey_content = ""
+    survey_title = "WhatsApp Survey"
     if file and file.filename:
         content = await file.read()
         if content:
             survey_content = survey_data_from_file(content, file.filename)
+            name = Path(file.filename).stem.strip()
+            if name:
+                survey_title = name
     if not survey_content and csv_text and csv_text.strip():
         survey_content = survey_data_to_text(csv_text.strip())
     if not survey_content:
@@ -845,7 +849,7 @@ async def survey_synthesize(
     report_doc = {
         "call_id": call_id,
         "meeting_id": "survey",
-        "meeting_title": "WhatsApp Survey",
+        "meeting_title": survey_title,
         "call_type": "Survey",
         "interviewer": "Survey",
         "report_card": data.get("report_card", data),

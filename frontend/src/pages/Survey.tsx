@@ -7,17 +7,30 @@ import { FileSpreadsheet, Loader2, MessageCircle, CheckCircle, AlertCircle, Arro
 export default function Survey() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
-  const [csvText, setCsvText] = useState('')
+  const [previewLines, setPreviewLines] = useState<string[]>([])
   const [running, setRunning] = useState(false)
   const [result, setResult] = useState<SynthResult | null>(null)
   const [error, setError] = useState('')
 
-  const canRun = (file != null && file.size > 0) || (csvText.trim().length > 0)
+  const canRun = file != null && file.size > 0
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
     setFile(f ?? null)
-    if (!f) setResult(null)
+    if (!f) {
+      setResult(null)
+      setPreviewLines([])
+      return
+    }
+    setResult(null)
+    f.text()
+      .then(text => {
+        const lines = text.split('\n').slice(0, 12)
+        setPreviewLines(lines.filter(l => l.trim().length > 0))
+      })
+      .catch(() => {
+        setPreviewLines([])
+      })
   }
 
   function handleSynthesize() {
@@ -26,7 +39,7 @@ export default function Survey() {
     setError('')
     setResult(null)
     api
-      .surveySynthesize(file ?? undefined, csvText.trim() || undefined)
+      .surveySynthesize(file ?? undefined, undefined)
       .then(setResult)
       .catch((e: Error) => setError(e.message))
       .finally(() => setRunning(false))
@@ -40,7 +53,7 @@ export default function Survey() {
           WhatsApp Survey Synthesis
         </h1>
         <p className="text-[15px] text-slate-500 mt-1.5">
-          Upload CSV or Excel (or paste CSV) to generate one Pain Report Card from survey data. Use it in Delta Analysis alongside meeting reports.
+          Upload WhatsApp survey CSV or Excel to generate one Pain Report Card from survey data. The file name is used as the report title.
         </p>
       </div>
 
@@ -68,16 +81,20 @@ export default function Survey() {
             </button>
           </div>
 
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm">
-            <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mb-3">Or paste CSV here</p>
-            <textarea
-              value={csvText}
-              onChange={e => setCsvText(e.target.value)}
-              placeholder="Paste survey export (e.g. question, respondent, answer)..."
-              rows={8}
-              className="w-full px-4 py-3 text-[14px] border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-400 transition-all placeholder:text-slate-400 font-mono"
-            />
-          </div>
+          {previewLines.length > 0 && (
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm space-y-3">
+              <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mb-1.5">
+                Preview (first {previewLines.length} line{previewLines.length > 1 ? 's' : ''})
+              </p>
+              <div className="mt-1 bg-slate-50 border border-dashed border-slate-200 rounded-xl">
+                <div className="max-h-40 overflow-auto px-3 pb-2">
+                  <pre className="text-[11px] text-slate-700 font-mono whitespace-pre-wrap">
+                    {previewLines.join('\n')}
+                  </pre>
+                </div>
+              </div>
+            </div>
+          )}
 
           <button
             onClick={handleSynthesize}

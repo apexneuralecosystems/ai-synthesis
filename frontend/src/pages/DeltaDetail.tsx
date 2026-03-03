@@ -44,7 +44,7 @@ export default function DeltaDetail() {
 
   return (
     <div>
-      <div className="flex items-center justify-between gap-4 mb-6">
+      <div className="flex items-center justify-between gap-4 mb-6 print-hide">
         <Link
           to="/delta"
           className="inline-flex items-center gap-2 text-[13px] font-semibold text-slate-500 hover:text-blue-600 transition-colors"
@@ -63,7 +63,7 @@ export default function DeltaDetail() {
       </div>
 
       {/* HEADER */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl p-7 mb-6 shadow-sm">
+      <div className="bg-white border border-slate-200/80 rounded-2xl p-7 mb-6 shadow-sm print:shadow-none print:border-0 print:rounded-none">
         <h1 className="text-[24px] font-extrabold text-slate-900 tracking-tight mb-3">Cross-Session Delta Report</h1>
         <div className="flex flex-wrap gap-4 text-[14px] text-slate-500 font-medium">
           {Array.isArray(meta.source_call_types) && <span>Lenses: <strong className="text-slate-700">{(meta.source_call_types as string[]).join(' + ')}</strong></span>}

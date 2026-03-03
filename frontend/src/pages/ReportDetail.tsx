@@ -85,7 +85,7 @@ export default function ReportDetail() {
 
   return (
     <div className="space-y-7">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-4 print-hide">
         <Link
           to="/reports"
           className="inline-flex items-center gap-2 text-[13px] font-semibold text-slate-500 hover:text-blue-600 transition-colors"
@@ -104,7 +104,7 @@ export default function ReportDetail() {
       </div>
 
       {/* HEADER */}
-      <div className="bg-white border border-slate-200/80 rounded-3xl p-8 shadow-sm">
+      <div className="bg-white border border-slate-200/80 rounded-3xl p-8 shadow-sm print:shadow-none print:border-0 print:rounded-none">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-[0.22em] mb-2">

@@ -8,6 +8,8 @@ export default function Survey() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [previewLines, setPreviewLines] = useState<string[]>([])
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [previewNote, setPreviewNote] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
   const [result, setResult] = useState<SynthResult | null>(null)
   const [error, setError] = useState('')
@@ -17,20 +19,31 @@ export default function Survey() {
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
     setFile(f ?? null)
+    setResult(null)
+    setPreviewLines([])
+    setPreviewNote(null)
     if (!f) {
-      setResult(null)
-      setPreviewLines([])
+      setPreviewOpen(false)
       return
     }
-    setResult(null)
-    f.text()
-      .then(text => {
-        const lines = text.split('\n').slice(0, 12)
-        setPreviewLines(lines.filter(l => l.trim().length > 0))
-      })
-      .catch(() => {
-        setPreviewLines([])
-      })
+    const name = f.name.toLowerCase()
+    // For CSV, read text and show preview; for Excel, show note only
+    if (name.endsWith('.csv')) {
+      f.text()
+        .then(text => {
+          const lines = text.split('\n').slice(0, 40)
+          const filtered = lines.filter(l => l.trim().length > 0)
+          setPreviewLines(filtered)
+          setPreviewOpen(true)
+        })
+        .catch(() => {
+          setPreviewLines([])
+          setPreviewOpen(false)
+        })
+    } else {
+      setPreviewNote('Preview is only available for CSV files. This Excel file will still be processed correctly when you click Synthesize.')
+      setPreviewOpen(true)
+    }
   }
 
   function handleSynthesize() {
@@ -80,21 +93,6 @@ export default function Survey() {
               </span>
             </button>
           </div>
-
-          {previewLines.length > 0 && (
-            <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm space-y-3">
-              <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mb-1.5">
-                Preview (first {previewLines.length} line{previewLines.length > 1 ? 's' : ''})
-              </p>
-              <div className="mt-1 bg-slate-50 border border-dashed border-slate-200 rounded-xl">
-                <div className="max-h-40 overflow-auto px-3 pb-2">
-                  <pre className="text-[11px] text-slate-700 font-mono whitespace-pre-wrap">
-                    {previewLines.join('\n')}
-                  </pre>
-                </div>
-              </div>
-            </div>
-          )}
 
           <button
             onClick={handleSynthesize}
@@ -153,11 +151,61 @@ export default function Survey() {
               </div>
             )}
             {!result && !error && (
-              <p className="text-[14px] text-slate-400">Upload or paste survey data and click Synthesize.</p>
+              <p className="text-[14px] text-slate-400">Upload your WhatsApp survey file and click Synthesize.</p>
             )}
           </div>
         </div>
       </div>
+
+      {/* Full-screen preview modal */}
+      {previewOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          onClick={() => setPreviewOpen(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[80vh] mx-4 overflow-hidden flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+              <div>
+                <p className="text-[13px] font-semibold text-slate-500 uppercase tracking-widest">Survey preview</p>
+                {file && (
+                  <p className="text-[13px] text-slate-700 mt-0.5 font-mono truncate">
+                    {file.name}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewOpen(false)}
+                className="text-[13px] font-medium text-slate-500 hover:text-slate-800"
+              >
+                Cancel
+              </button>
+            </div>
+            <div className="px-6 py-4 flex-1 overflow-auto">
+              {previewNote && (
+                <p className="text-[13px] text-slate-500 mb-3">
+                  {previewNote}
+                </p>
+              )}
+              {previewLines.length > 0 && (
+                <div className="border border-slate-200 rounded-xl bg-slate-50 max-h-[64vh] overflow-auto">
+                  <pre className="px-4 py-3 text-[12px] text-slate-800 font-mono whitespace-pre-wrap">
+                    {previewLines.join('\n')}
+                  </pre>
+                </div>
+              )}
+              {!previewNote && previewLines.length === 0 && (
+                <p className="text-[13px] text-slate-400">
+                  No preview available for this file.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

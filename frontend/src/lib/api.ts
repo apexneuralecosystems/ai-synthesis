@@ -189,6 +189,21 @@ export const api = {
     }
     return res.json()
   },
+  /** WhatsApp survey preview: normalized text from CSV/Excel for UI preview only. */
+  surveyPreview: async (file: File): Promise<string> => {
+    const form = new FormData()
+    form.append('file', file)
+    const res = await fetch(`${BASE}/survey/preview`, {
+      method: 'POST',
+      body: form,
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: res.statusText }))
+      throw new Error(body.detail || `HTTP ${res.status}`)
+    }
+    const data = (await res.json()) as { preview?: string }
+    return data.preview ?? ''
+  },
   /** CEO/Operations/Tech synthesis from document: .docx file or pasted text. */
   synthesizeDoc: async (
     callType: string,

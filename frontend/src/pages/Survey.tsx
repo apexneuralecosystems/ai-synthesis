@@ -11,6 +11,8 @@ export default function Survey() {
   const [previewOpen, setPreviewOpen] = useState(false)
   const [previewNote, setPreviewNote] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const progressRef = useRef<number | null>(null)
   const [result, setResult] = useState<SynthResult | null>(null)
   const [error, setError] = useState('')
 
@@ -26,36 +28,52 @@ export default function Survey() {
       setPreviewOpen(false)
       return
     }
-    const name = f.name.toLowerCase()
-    // For CSV, read text and show preview; for Excel, show note only
-    if (name.endsWith('.csv')) {
-      f.text()
-        .then(text => {
-          const lines = text.split('\n').slice(0, 40)
-          const filtered = lines.filter(l => l.trim().length > 0)
-          setPreviewLines(filtered)
+    api.surveyPreview(f)
+      .then(text => {
+        const lines = text.split('\n').slice(0, 80)
+        const filtered = lines.filter(l => l.trim().length > 0)
+        setPreviewLines(filtered)
+        setPreviewNote(null)
+        if (filtered.length > 0) {
           setPreviewOpen(true)
-        })
-        .catch(() => {
-          setPreviewLines([])
-          setPreviewOpen(false)
-        })
-    } else {
-      setPreviewNote('Preview is only available for CSV files. This Excel file will still be processed correctly when you click Synthesize.')
-      setPreviewOpen(true)
-    }
+        }
+      })
+      .catch((err: Error) => {
+        setPreviewLines([])
+        setPreviewNote(err.message || 'Could not generate preview, but the file will still be processed when you click Synthesize.')
+        setPreviewOpen(true)
+      })
   }
 
   function handleSynthesize() {
     if (!canRun) return
+    if (progressRef.current != null) {
+      window.clearInterval(progressRef.current)
+    }
+    setProgress(0)
     setRunning(true)
     setError('')
     setResult(null)
+    const id = window.setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 90) return prev
+        return prev + 2
+      })
+    }, 400)
+    progressRef.current = id
     api
       .surveySynthesize(file ?? undefined, undefined)
       .then(setResult)
       .catch((e: Error) => setError(e.message))
-      .finally(() => setRunning(false))
+      .finally(() => {
+        setRunning(false)
+        if (progressRef.current != null) {
+          window.clearInterval(progressRef.current)
+          progressRef.current = null
+        }
+        setProgress(100)
+        window.setTimeout(() => setProgress(0), 800)
+      })
   }
 
   return (
@@ -111,6 +129,21 @@ export default function Survey() {
               </>
             )}
           </button>
+
+          {progress > 0 && (
+            <div className="mt-3">
+              <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+                <span>Survey synthesis progress</span>
+                <span>{Math.min(progress, 100)}%</span>
+              </div>
+              <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-emerald-500 rounded-full transition-all"
+                  style={{ width: `${Math.min(progress, 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Result */}

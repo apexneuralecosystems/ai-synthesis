@@ -28,6 +28,8 @@ export default function Synthesis() {
   const [callType, setCallType] = useState<string>('CEO')
   const [interviewer, setInterviewer] = useState('Anshul Jain')
   const [running, setRunning] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const progressRef = useRef<number | null>(null)
   const [result, setResult] = useState<{ status: string; report_id: string; call_id: string; message?: string; usage?: Record<string, unknown>; quote_check?: { quote: string; found: boolean }[] } | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -47,19 +49,46 @@ export default function Synthesis() {
 
   function handleSynthesize() {
     if (inputMode === 'meeting' && !selected) return
+    if (progressRef.current != null) {
+      window.clearInterval(progressRef.current)
+    }
+    setProgress(0)
     setRunning(true)
     setError('')
     setResult(null)
+    const id = window.setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 90) return prev
+        return prev + 2
+      })
+    }, 400)
+    progressRef.current = id
     if (inputMode === 'meeting') {
       api.synthesize(selected!.meeting_id, callType, interviewer)
         .then(r => setResult(r))
         .catch(e => setError(e.message))
-        .finally(() => setRunning(false))
+        .finally(() => {
+          setRunning(false)
+          if (progressRef.current != null) {
+            window.clearInterval(progressRef.current)
+            progressRef.current = null
+          }
+          setProgress(100)
+          window.setTimeout(() => setProgress(0), 800)
+        })
     } else {
       api.synthesizeDoc(callType, interviewer, docFile ?? undefined, docText.trim() || undefined, docTitle.trim() || undefined)
         .then(r => setResult(r))
         .catch(e => setError(e.message))
-        .finally(() => setRunning(false))
+        .finally(() => {
+          setRunning(false)
+          if (progressRef.current != null) {
+            window.clearInterval(progressRef.current)
+            progressRef.current = null
+          }
+          setProgress(100)
+          window.setTimeout(() => setProgress(0), 800)
+        })
     }
   }
 
@@ -310,6 +339,21 @@ export default function Synthesis() {
               </>
             )}
           </button>
+
+          {progress > 0 && (
+            <div className="mt-3">
+              <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+                <span>Synthesis progress</span>
+                <span>{Math.min(progress, 100)}%</span>
+              </div>
+              <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-blue-600 rounded-full transition-all"
+                  style={{ width: `${Math.min(progress, 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Error */}
           {error && (

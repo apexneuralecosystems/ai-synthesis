@@ -867,6 +867,30 @@ async def survey_synthesize(
     }
 
 
+@app.post("/api/survey/preview")
+async def survey_preview(file: UploadFile = File(...)):
+    """
+    Preview WhatsApp survey data (CSV or Excel) as normalized text for the UI.
+    Uses the same parser as synthesis but returns only a text snippet.
+    """
+    if not file.filename:
+        raise HTTPException(400, "File name is required.")
+    content = await file.read()
+    if not content:
+        raise HTTPException(400, "Uploaded file is empty.")
+    try:
+        text = survey_data_from_file(content, file.filename)
+    except HTTPException:
+        # Propagate known HTTP errors (e.g., invalid Excel)
+        raise
+    except Exception as e:
+        logger.warning("Survey preview failed: %s", e)
+        raise HTTPException(400, f"Could not parse survey file: {e}") from e
+    lines = text.splitlines()
+    head = "\n".join(lines[:200])
+    return {"preview": head}
+
+
 # ═══════════════ Delta Endpoints ═══════════════
 
 @app.get("/api/deltas")

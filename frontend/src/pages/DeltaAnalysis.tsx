@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 import type { PainReportItem, DeltaItem } from '../lib/api'
@@ -22,6 +22,8 @@ export default function DeltaAnalysis() {
   const [result, setResult] = useState<{ delta_id: string; usage: Record<string, unknown> } | null>(null)
   const [loading, setLoading] = useState(true)
   const [deletingDelta, setDeletingDelta] = useState<string | null>(null)
+  const [progress, setProgress] = useState(0)
+  const progressRef = useRef<number | null>(null)
 
   const selectedFolderId = meetingsCtx?.selectedFolderId ?? null
 
@@ -42,16 +44,35 @@ export default function DeltaAnalysis() {
 
   function handleRun() {
     if (selected.size < 2) return
+    if (progressRef.current != null) {
+      window.clearInterval(progressRef.current)
+    }
+    setProgress(0)
     setRunning(true)
     setError('')
     setResult(null)
+    const id = window.setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 90) return prev
+        return prev + 2
+      })
+    }, 400)
+    progressRef.current = id
     api.runDelta(Array.from(selected))
       .then(r => {
         setResult({ delta_id: r.delta_id, usage: r.usage })
         api.deltas().then(setDeltas)
       })
       .catch(e => setError(e.message))
-      .finally(() => setRunning(false))
+      .finally(() => {
+        setRunning(false)
+        if (progressRef.current != null) {
+          window.clearInterval(progressRef.current)
+          progressRef.current = null
+        }
+        setProgress(100)
+        window.setTimeout(() => setProgress(0), 800)
+      })
   }
 
   async function handleDeleteDelta(id: string) {
@@ -186,6 +207,20 @@ export default function DeltaAnalysis() {
                 </>
               )}
             </button>
+            {progress > 0 && (
+              <div className="flex-1">
+                <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+                  <span>Delta analysis progress</span>
+                  <span>{Math.min(progress, 100)}%</span>
+                </div>
+                <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-blue-600 rounded-full transition-all"
+                    style={{ width: `${Math.min(progress, 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
             {selected.size === 1 && (
               <span className="text-[13px] text-amber-600 flex items-center gap-1.5 font-medium">
                 <AlertCircle className="w-4 h-4" />

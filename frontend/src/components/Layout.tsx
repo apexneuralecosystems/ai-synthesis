@@ -6,7 +6,6 @@ import { useMeetings } from '../context/MeetingsContext'
 
 const NAV = [
   { to: '/', label: 'Meetings', icon: Mic, desc: 'View all calls' },
-  { to: '/bin', label: 'Bin', icon: Trash2, desc: 'Recover or delete' },
   { to: '/synthesis', label: 'Synthesis', icon: FlaskConical, desc: 'Generate reports' },
   { to: '/reports', label: 'Reports', icon: FileText, desc: 'Pain report cards' },
   { to: '/delta', label: 'Delta Analysis', icon: GitCompare, desc: 'Compare sessions' },
@@ -67,7 +66,34 @@ export default function Layout({ children }: { children: ReactNode }) {
           )}
         </div>
 
-        {/* Folders: always visible when sidebar open, ~half of sidebar with scroll; folder rows with different colors */}
+        {/* Nav: Meetings, Synthesis, Reports, Delta Analysis */}
+        <nav className="flex-shrink-0 px-3 py-4 space-y-1 overflow-y-auto min-h-0">
+          {NAV.map(({ to, label, icon: Icon, desc }) => {
+            const active = to === '/' ? pathname === '/' || pathname.startsWith('/meeting/') : pathname.startsWith(to)
+            return (
+              <Link
+                key={to}
+                to={to}
+                title={label}
+                className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm transition-all duration-150 ${
+                  active
+                    ? 'bg-[var(--sidebar-accent-soft)] text-[var(--sidebar-accent-dark)] font-bold shadow-sm shadow-blue-100 border-l-2 border-[var(--sidebar-accent-dark)]'
+                    : 'text-slate-500 hover:bg-slate-50/80 hover:text-slate-700 font-medium'
+                } ${!open ? 'justify-center px-0' : ''}`}
+              >
+                <Icon className={`flex-shrink-0 ${active ? 'w-5 h-5' : 'w-[18px] h-[18px]'}`} strokeWidth={active ? 2.5 : 2} />
+                {open && (
+                  <div className="min-w-0">
+                    <span className="block leading-tight">{label}</span>
+                    {active && <span className="block text-[10px] text-[var(--sidebar-accent)] font-medium mt-0.5">{desc}</span>}
+                  </div>
+                )}
+              </Link>
+            )
+          })}
+        </nav>
+
+        {/* Folders: after main nav, ~half of sidebar with scroll; folder rows with different colors */}
         {open && ctx && (
           <div className="px-3 pt-2 pb-2 border-b border-slate-100/80 flex flex-col gap-2 flex-1 min-h-0 flex-shrink overflow-hidden">
             <p className="px-2 pb-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 flex-shrink-0">
@@ -170,32 +196,26 @@ export default function Layout({ children }: { children: ReactNode }) {
           </div>
         )}
 
-        {/* Nav */}
-        <nav className="flex-shrink-0 px-3 py-4 space-y-1 overflow-y-auto min-h-0">
-          {NAV.map(({ to, label, icon: Icon, desc }) => {
-            const active = to === '/' ? pathname === '/' || pathname.startsWith('/meeting/') : to === '/bin' ? pathname === '/bin' : pathname.startsWith(to)
-            return (
-              <Link
-                key={to}
-                to={to}
-                title={label}
-                className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm transition-all duration-150 ${
-                  active
-                    ? 'bg-[var(--sidebar-accent-soft)] text-[var(--sidebar-accent-dark)] font-bold shadow-sm shadow-blue-100 border-l-2 border-[var(--sidebar-accent-dark)]'
-                    : 'text-slate-500 hover:bg-slate-50/80 hover:text-slate-700 font-medium'
-                } ${!open ? 'justify-center px-0' : ''}`}
-              >
-                <Icon className={`flex-shrink-0 ${active ? 'w-5 h-5' : 'w-[18px] h-[18px]'}`} strokeWidth={active ? 2.5 : 2} />
-                {open && (
-                  <div className="min-w-0">
-                    <span className="block leading-tight">{label}</span>
-                    {active && <span className="block text-[10px] text-[var(--sidebar-accent)] font-medium mt-0.5">{desc}</span>}
-                  </div>
-                )}
-              </Link>
-            )
-          })}
-        </nav>
+        {/* Bin: last, after Folders */}
+        <div className="flex-shrink-0 px-3 pb-2">
+          <Link
+            to="/bin"
+            title="Bin"
+            className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm transition-all duration-150 ${
+              pathname === '/bin'
+                ? 'bg-[var(--sidebar-accent-soft)] text-[var(--sidebar-accent-dark)] font-bold shadow-sm shadow-blue-100 border-l-2 border-[var(--sidebar-accent-dark)]'
+                : 'text-slate-500 hover:bg-slate-50/80 hover:text-slate-700 font-medium'
+            } ${!open ? 'justify-center px-0' : ''}`}
+          >
+            <Trash2 className={`flex-shrink-0 ${pathname === '/bin' ? 'w-5 h-5' : 'w-[18px] h-[18px]'}`} strokeWidth={pathname === '/bin' ? 2.5 : 2} />
+            {open && (
+              <div className="min-w-0">
+                <span className="block leading-tight">Bin</span>
+                {pathname === '/bin' && <span className="block text-[10px] text-[var(--sidebar-accent)] font-medium mt-0.5">Recover or delete</span>}
+              </div>
+            )}
+          </Link>
+        </div>
 
         {/* Toggle button */}
         <button

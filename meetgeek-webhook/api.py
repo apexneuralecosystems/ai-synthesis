@@ -3,7 +3,9 @@ REST API: meetings list, detail, transcripts, AI analysis (user-triggered), dash
 All dates returned in IST (Indian Standard Time, UTC+5:30).
 """
 import logging
+import re
 from datetime import datetime, timezone, timedelta
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from motor.motor_asyncio import AsyncIOMotorDatabase
@@ -179,9 +181,11 @@ class MeetingImportRequest(BaseModel):
     """
     Import a meeting + transcript from JSON (manual upload).
     This does NOT call MeetGeek; it just writes into Mongo so the UI and synthesis can use it.
+    meeting_id is optional: if omitted, one is generated (title+date or import-<uuid>) so you can
+    import the same document multiple times as separate meetings (e.g. daily same-name meetings).
     """
 
-    meeting_id: str
+    meeting_id: str | None = None
     title: str | None = None
     transcript: str
     transcript_sentences: list[dict] | None = None
@@ -282,6 +286,16 @@ async def list_meetings(
     )
 
 
+def _generate_meeting_id_for_import(body: MeetingImportRequest) -> str:
+    """Generate a unique meeting_id when not provided (e.g. same-name daily imports)."""
+    if body.title and body.date:
+        safe_title = re.sub(r"[^\w\s-]", "", (body.title or "")[:40]).strip().replace(" ", "-") or "meeting"
+        safe_date = re.sub(r"[^\w-]", "", (body.date or "")[:20]) or ""
+        if safe_date:
+            return f"{safe_title}-{safe_date}-{uuid4().hex[:8]}"
+    return f"import-{uuid4().hex}"
+
+
 @router.post("/meetings/import", response_model=MeetingDetail)
 async def import_meeting(
     body: MeetingImportRequest,
@@ -291,10 +305,12 @@ async def import_meeting(
     Import a meeting and transcript from JSON.
 
     This is intended for manual uploads or non-MeetGeek sources.
-    If a meeting with the same meeting_id already exists, it will be updated.
+    - If meeting_id is omitted, one is generated so you can import the same document multiple times (e.g. daily same-name meetings).
+    - If a meeting with the same meeting_id already exists, it will be updated and restored from bin if it was trashed.
     """
+    mid = body.meeting_id or _generate_meeting_id_for_import(body)
     meeting_data: dict = {
-        "meeting_id": body.meeting_id,
+        "meeting_id": mid,
         "title": body.title,
         "transcript": body.transcript,
         "transcript_sentences": body.transcript_sentences,
@@ -302,14 +318,14 @@ async def import_meeting(
         "source": body.source or "manual-upload",
         "host_email": body.host_email,
         "language": body.language,
-        # Store date and duration in the same fields used by MeetGeek imports
         "date": body.date,
         "duration": body.duration_seconds,
         "processed": False,
     }
 
     await save_meeting(db, meeting_data)
-    stored = await get_meeting(db, body.meeting_id)
+    await restore_meeting(db, mid)
+    stored = await get_meeting(db, mid)
     if not stored:
         raise HTTPException(status_code=500, detail="Failed to import meeting")
     return _meeting_to_detail(stored)

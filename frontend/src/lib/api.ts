@@ -101,7 +101,8 @@ export interface ChatMessage {
 }
 
 export interface MeetingImportPayload {
-  meeting_id: string
+  /** Optional: if omitted, backend generates a unique id (so you can import same document multiple times, e.g. daily). */
+  meeting_id?: string | null
   title?: string | null
   transcript: string
   transcript_sentences?: TranscriptSentence[] | null

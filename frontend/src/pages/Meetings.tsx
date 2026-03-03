@@ -139,12 +139,12 @@ export default function Meetings() {
       setUploading(true)
       const text = await file.text()
       const json = JSON.parse(text) as MeetingImportPayload
-      if (!json.meeting_id || !json.transcript) {
-        throw new Error('JSON must include at least "meeting_id" and "transcript" fields.')
+      if (!json.transcript) {
+        throw new Error('JSON must include at least "transcript". Optionally include "meeting_id", "title", "date" (omit meeting_id to create a new meeting each time, e.g. same-name daily).')
       }
       await api.importMeeting(json)
       // Refresh meetings list so the new one appears
-      const fresh = await api.meetings()
+      const fresh = await api.meetingsAll(selectedFolderId ?? undefined)
       setMeetings(fresh)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to import meeting'

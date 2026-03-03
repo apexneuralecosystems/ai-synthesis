@@ -144,6 +144,10 @@ body {
 
 /* Print-only formatting: focus on main content, hide chrome */
 @media print {
+  @page {
+    size: A4;
+    margin: 15mm;
+  }
   body {
     background: #ffffff !important;
     height: auto !important;
@@ -151,6 +155,8 @@ body {
   }
   .app-shell {
     background: #ffffff !important;
+    height: auto !important;
+    overflow: visible !important;
   }
   .app-shell aside {
     display: none !important;

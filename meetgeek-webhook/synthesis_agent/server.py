@@ -30,7 +30,7 @@ if str(_base) not in sys.path:
     sys.path.insert(0, str(_base))
 
 from api import router as api_router
-from database import init_db
+from database import init_db, get_database, sync_auto_folders_by_title
 from webhook import router as webhook_router
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -273,6 +273,13 @@ async def startup():
     except Exception as e:
         logger.warning("MongoDB migrations failed or skipped in startup: %s", e)
     ensure_collections()
+    # Sync auto-folders for existing meetings (group by normalized title, create folders for 2+ same name).
+    try:
+        db = get_database()
+        await sync_auto_folders_by_title(db)
+        logger.info("Auto-folders synced by meeting title (existing meetings).")
+    except Exception as e:
+        logger.warning("Auto-folder sync on startup failed (non-fatal): %s", e)
 
 
 # ═══════════════ Meeting Endpoints ═══════════════

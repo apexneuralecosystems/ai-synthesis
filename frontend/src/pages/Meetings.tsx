@@ -76,6 +76,11 @@ export default function Meetings() {
   const [_movingId, setMovingId] = useState<string | null>(null)
   const [openMoveId, setOpenMoveId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const docxInputRef = useRef<HTMLInputElement | null>(null)
+  const [importType, setImportType] = useState<'json' | 'docx'>('json')
+  const [docName, setDocName] = useState('')
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [docxFile, setDocxFile] = useState<File | null>(null)
 
   useEffect(() => {
     setLoading(true)
@@ -143,9 +148,9 @@ export default function Meetings() {
         throw new Error('JSON must include at least "transcript". Optionally include "meeting_id", "title", "date" (omit meeting_id to create a new meeting each time, e.g. same-name daily).')
       }
       await api.importMeeting(json)
-      // Refresh meetings list so the new one appears
       const fresh = await api.meetingsAll(selectedFolderId ?? undefined)
       setMeetings(fresh)
+      setImportDialogOpen(false)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to import meeting'
       setError(msg)
@@ -154,6 +159,25 @@ export default function Meetings() {
       if (e.target) {
         e.target.value = ''
       }
+    }
+  }
+
+  async function handleDocxImport() {
+    if (!docxFile || !docName.trim()) return
+    try {
+      setUploading(true)
+      await api.importMeetingDoc(docxFile, docName.trim())
+      const fresh = await api.meetingsAll(selectedFolderId ?? undefined)
+      setMeetings(fresh)
+      setImportDialogOpen(false)
+      setDocxFile(null)
+      setDocName('')
+      if (docxInputRef.current) docxInputRef.current.value = ''
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to import document'
+      setError(msg)
+    } finally {
+      setUploading(false)
     }
   }
 
@@ -204,9 +228,19 @@ export default function Meetings() {
             className="hidden"
             onChange={handleFileChange}
           />
+          <input
+            ref={docxInputRef}
+            type="file"
+            accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            className="hidden"
+            onChange={e => {
+              const f = e.target.files?.[0]
+              setDocxFile(f ?? null)
+            }}
+          />
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => setImportDialogOpen(true)}
             disabled={uploading}
             className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] text-white text-[13px] font-medium px-4 py-2.5 shadow-sm hover:bg-[var(--color-primary-dark)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
           >
@@ -215,6 +249,86 @@ export default function Meetings() {
           </button>
         </div>
       </div>
+
+      {/* Import dialog: JSON or DOCX */}
+      {importDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => !uploading && setImportDialogOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6 w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-slate-800 mb-4">Import meeting</h3>
+            <p className="text-[13px] text-slate-500 mb-4">Choose format: JSON (transcript payload) or DOCX (document).</p>
+            <div className="flex gap-4 mb-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="importType" checked={importType === 'json'} onChange={() => setImportType('json')} className="rounded-full" />
+                <span className="text-[14px] font-medium text-slate-700">JSON</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="importType" checked={importType === 'docx'} onChange={() => setImportType('docx')} className="rounded-full" />
+                <span className="text-[14px] font-medium text-slate-700">DOCX</span>
+              </label>
+            </div>
+
+            {importType === 'json' && (
+              <div className="mb-4">
+                <p className="text-[12px] text-slate-500 mb-2">Upload a JSON file with at least <code className="bg-slate-100 px-1 rounded">transcript</code>.</p>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-slate-50 text-slate-700 text-[13px] font-medium px-3 py-2 hover:bg-slate-100 disabled:opacity-60"
+                >
+                  <Upload className="w-4 h-4" />
+                  Choose JSON file
+                </button>
+              </div>
+            )}
+
+            {importType === 'docx' && (
+              <div className="space-y-4 mb-4">
+                <div>
+                  <p className="text-[12px] text-slate-500 mb-2">Document name (saved as meeting title)</p>
+                  <input
+                    type="text"
+                    value={docName}
+                    onChange={e => setDocName(e.target.value)}
+                    placeholder="e.g. Q1 Strategy Doc"
+                    className="w-full px-3 py-2.5 text-[14px] border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400"
+                  />
+                </div>
+                <div>
+                  <p className="text-[12px] text-slate-500 mb-2">.docx file</p>
+                  <button
+                    type="button"
+                    onClick={() => docxInputRef.current?.click()}
+                    disabled={uploading}
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-slate-50 text-slate-700 text-[13px] font-medium px-3 py-2 hover:bg-slate-100 disabled:opacity-60"
+                  >
+                    <Upload className="w-4 h-4" />
+                    {docxFile ? docxFile.name : 'Choose .docx file'}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDocxImport}
+                  disabled={uploading || !docxFile || !docName.trim()}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] text-white text-[13px] font-medium py-2.5 hover:bg-[var(--color-primary-dark)] disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {uploading ? 'Importing...' : 'Import document'}
+                </button>
+              </div>
+            )}
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => !uploading && setImportDialogOpen(false)}
+                className="text-[13px] font-medium text-slate-500 hover:text-slate-700"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Search */}
       <div className="relative mb-6">

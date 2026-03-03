@@ -231,6 +231,21 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+  /** Import a .docx file as a meeting; docName is used as the meeting title and saved with that name. */
+  importMeetingDoc: async (file: File, docName: string): Promise<MeetingDetail> => {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('doc_name', docName.trim())
+    const res = await fetch(`${BASE}/meetings/import/doc`, {
+      method: 'POST',
+      body: form,
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: res.statusText }))
+      throw new Error(body.detail || `HTTP ${res.status}`)
+    }
+    return res.json()
+  },
   clearTranscript: (meetingId: string) =>
     req<MeetingDetail>(`/meetings/${meetingId}/transcript`, {
       method: 'DELETE',

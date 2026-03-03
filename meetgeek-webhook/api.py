@@ -2,12 +2,13 @@
 REST API: meetings list, detail, transcripts, AI analysis (user-triggered), dashboard.
 All dates returned in IST (Indian Standard Time, UTC+5:30).
 """
+import io
 import logging
 import re
 from datetime import datetime, timezone, timedelta
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel, ConfigDict, field_serializer
 
@@ -303,6 +304,29 @@ def _generate_meeting_id_for_import(body: MeetingImportRequest) -> str:
     return f"import-{uuid4().hex}"
 
 
+def _extract_text_from_docx(content: bytes, filename: str) -> str:
+    """Extract plain text from .docx for meeting import. Raises HTTPException on failure."""
+    name = (filename or "").lower()
+    if not name.endswith(".docx"):
+        raise HTTPException(400, "File must be a .docx document.")
+    try:
+        from docx import Document
+        doc = Document(io.BytesIO(content))
+        parts = []
+        for para in doc.paragraphs:
+            if para.text.strip():
+                parts.append(para.text)
+        for table in doc.tables:
+            for row in table.rows:
+                cells = [c.text.strip() for c in row.cells if c.text.strip()]
+                if cells:
+                    parts.append(" | ".join(cells))
+        return "\n\n".join(parts) if parts else ""
+    except Exception as e:
+        logger.warning("DOCX extract failed: %s", e)
+        raise HTTPException(400, f"Could not read DOCX: {e}") from e
+
+
 @router.post("/meetings/import", response_model=MeetingDetail)
 async def import_meeting(
     body: MeetingImportRequest,
@@ -335,6 +359,46 @@ async def import_meeting(
     stored = await get_meeting(db, mid)
     if not stored:
         raise HTTPException(status_code=500, detail="Failed to import meeting")
+    return _meeting_to_detail(stored)
+
+
+@router.post("/meetings/import/doc", response_model=MeetingDetail)
+async def import_meeting_doc(
+    file: UploadFile = File(..., description=".docx file to import as meeting transcript"),
+    doc_name: str = Form(..., description="Document name (used as meeting title and for display)"),
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
+    """
+    Import a .docx file as a meeting. The document name is used as the meeting title and saved with that name.
+    Extracts text from the DOCX and creates a single meeting with source docx-import.
+    """
+    if not (doc_name or doc_name.strip()):
+        raise HTTPException(400, "Document name is required.")
+    doc_name = doc_name.strip()
+    content = await file.read()
+    transcript = _extract_text_from_docx(content, file.filename or "")
+    if not transcript.strip():
+        raise HTTPException(400, "The document appears to be empty or could not be read.")
+    safe_title = re.sub(r"[^\w\s-]", "", doc_name[:80]).strip().replace(" ", "-") or "doc"
+    mid = f"{safe_title}-{uuid4().hex[:8]}"
+    meeting_data: dict = {
+        "meeting_id": mid,
+        "title": doc_name,
+        "transcript": transcript,
+        "transcript_sentences": None,
+        "participants": None,
+        "source": "docx-import",
+        "host_email": None,
+        "language": None,
+        "date": datetime.now(timezone.utc).isoformat(),
+        "duration": None,
+        "processed": False,
+    }
+    await save_meeting(db, meeting_data)
+    await restore_meeting(db, mid)
+    stored = await get_meeting(db, mid)
+    if not stored:
+        raise HTTPException(status_code=500, detail="Failed to import document as meeting")
     return _meeting_to_detail(stored)
 
 

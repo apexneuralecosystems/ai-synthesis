@@ -65,6 +65,99 @@ export interface PainReportItem {
   summary: string
 }
 
+/** Normalize LLM model name for display; backend uses Opus 4.6 only. */
+export function displayModelName(model: string | undefined | null): string {
+  if (!model) return 'Opus 4.6'
+  const m = String(model).toLowerCase()
+  if (m.includes('opus') && (m.includes('4.6') || m.includes('4-6'))) return 'Opus 4.6'
+  return model
+}
+
+/** Pain Report Card JSON structure (matches backend schema). */
+export interface CostEstimate {
+  amount: string
+  confidence: 'high' | 'medium' | 'low'
+  method: 'direct' | 'derived' | 'guesstimate'
+  basis: string
+}
+
+export interface PainPoint {
+  id: string
+  title: string
+  description?: string
+  severity: number
+  severity_rationale?: string
+  source_quotes?: string[]
+  cost_estimate?: CostEstimate
+  affected_stakeholders?: string[]
+  current_workaround?: string
+  agent_opportunity?: string
+  pain_category?: string
+  pain_label?: string
+  business_impact?: string
+}
+
+export interface ReportCardMeta {
+  call_id?: string
+  call_type?: string
+  date?: string
+  duration_minutes?: number
+  participants?: string[]
+  interviewer?: string
+  transcript_file?: string
+}
+
+export interface DataSignals {
+  systems_mentioned?: string[]
+  data_sources_identified?: string[]
+  data_sources?: string[]
+  access_feasibility?: string
+  access_notes?: string
+}
+
+export interface StakeholderAssessment {
+  enthusiasm_level?: number
+  enthusiasm_rationale?: string
+  trust_level?: number
+  trust_rationale?: string
+  decision_authority?: string
+  decision_authority_notes?: string
+  champion_identified?: string
+  resistance_risks?: string
+}
+
+export interface HypothesisUpdates {
+  confirmed?: string[]
+  invalidated?: string[]
+  new?: string[]
+}
+
+export interface PainReportCard {
+  meta?: ReportCardMeta
+  executive_summary?: string
+  pain_points?: PainPoint[]
+  data_signals?: DataSignals
+  data_signals_identified?: DataSignals
+  stakeholder_assessment?: StakeholderAssessment
+  key_numbers?: Record<string, unknown>
+  open_questions?: string[]
+  hypothesis_updates?: HypothesisUpdates
+  call_type_specific_notes?: Record<string, unknown>
+  pain_validity_score?: number
+  pain_validity_rationale?: string
+  recommended_next_steps?: string[]
+}
+
+export interface ReportDoc {
+  _id?: string
+  meeting_id?: string
+  meeting_title?: string
+  call_type?: string
+  report_card?: PainReportCard
+  quote_check?: { quote: string; found: boolean }[]
+  usage?: { model: string; input_tokens: number; output_tokens: number; elapsed_seconds: number }
+}
+
 export interface DeltaItem {
   _id: string
   source_calls: string[]
@@ -164,7 +257,7 @@ export const api = {
     const q = folderId !== undefined && folderId !== null ? `?folder_id=${encodeURIComponent(folderId)}` : ''
     return req<PainReportItem[]>(`/reports${q}`)
   },
-  report: (id: string) => req<Record<string, unknown>>(`/reports/${id}`),
+  report: (id: string) => req<ReportDoc>(`/reports/${id}`),
   deleteReport: (id: string) => req<{ status: string }>(`/reports/${id}`, { method: 'DELETE' }),
   reportsTrash: () => req<PainReportItem[]>('/reports/trash'),
   restoreReport: (id: string) => req<{ status: string; report_id: string }>(`/reports/${id}/restore`, { method: 'POST' }),

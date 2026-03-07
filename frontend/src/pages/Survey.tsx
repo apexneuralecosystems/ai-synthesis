@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api } from '../lib/api'
+import { api, displayModelName } from '../lib/api'
 import type { SynthResult } from '../lib/api'
 import { FileSpreadsheet, Loader2, MessageCircle, CheckCircle, AlertCircle, ArrowRight } from 'lucide-react'
 
@@ -177,7 +177,8 @@ export default function Survey() {
                 </Link>
                 {result.usage && (
                   <div className="pt-3 border-t border-slate-100 text-[12px] text-slate-400">
-                    Tokens: in {result.usage.input_tokens}, out {result.usage.output_tokens}
+                    Model: <strong className="text-slate-600">{displayModelName(result.usage.model)}</strong>
+                    {' · '}Tokens: in {result.usage.input_tokens}, out {result.usage.output_tokens}
                     {result.usage.elapsed_seconds != null && ` · ${result.usage.elapsed_seconds.toFixed(1)}s`}
                   </div>
                 )}

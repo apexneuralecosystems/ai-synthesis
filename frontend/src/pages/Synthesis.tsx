@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api } from '../lib/api'
+import { api, displayModelName } from '../lib/api'
 import type { Meeting } from '../lib/api'
 import { useMeetings } from '../context/MeetingsContext'
 import { Search, FlaskConical, Loader2, CheckCircle, AlertCircle, Mic, Calendar, ArrowRight, FolderOpen, FileText } from 'lucide-react'
@@ -330,7 +330,7 @@ export default function Synthesis() {
             {running ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Analyzing with GPT-4o...
+                Analyzing with Opus 4.6...
               </>
             ) : (
               <>
@@ -391,7 +391,7 @@ export default function Synthesis() {
                   <div className="grid grid-cols-2 gap-4">
                     {[
                       { label: 'Report ID', value: result.call_id },
-                      { label: 'Model', value: String((result.usage as Record<string, unknown>)?.model ?? '') },
+                      { label: 'Model', value: displayModelName((result.usage as Record<string, unknown>)?.model as string) },
                       { label: 'Tokens In', value: String((result.usage as Record<string, unknown>)?.input_tokens ?? 0).replace(/\B(?=(\d{3})+(?!\d))/g, ',') },
                       { label: 'Tokens Out', value: String((result.usage as Record<string, unknown>)?.output_tokens ?? 0).replace(/\B(?=(\d{3})+(?!\d))/g, ',') },
                     ].map(item => (

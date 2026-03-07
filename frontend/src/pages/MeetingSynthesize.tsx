@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft, Loader2, CheckCircle, Mic, Play } from 'lucide-react'
-import { api } from '../lib/api'
+import { api, displayModelName } from '../lib/api'
 import type { MeetingDetail, SynthResult } from '../lib/api'
 
 const CALL_TYPES = [
@@ -95,7 +95,7 @@ export default function MeetingSynthesize() {
               if (usage == null) return null
               return (
                 <p className="text-xs text-[var(--slate-500)] mt-1">
-                  {usage.model} · {usage.input_tokens} in / {usage.output_tokens} out · {usage.elapsed_seconds}s
+                  {displayModelName(usage.model)} · {usage.input_tokens} in / {usage.output_tokens} out · {usage.elapsed_seconds}s
                 </p>
               )
             })()}
@@ -180,7 +180,7 @@ export default function MeetingSynthesize() {
             className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[var(--blue-600)] text-white font-semibold hover:bg-[var(--blue-700)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {synthesizing ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Analyzing with GPT-4o...</>
+              <><Loader2 className="w-4 h-4 animate-spin" /> Analyzing with Opus 4.6...</>
             ) : (
               <><Play className="w-4 h-4" /> Run Synthesis</>
             )}

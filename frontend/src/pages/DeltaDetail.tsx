@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { api } from '../lib/api'
+import { api, displayModelName } from '../lib/api'
 import {
   ArrowLeft, CheckCircle2, XCircle, Target, Quote, Download,
   Sparkles, DollarSign, BarChart3, Eye, MessageCircle, ShieldAlert,
@@ -305,7 +305,7 @@ export default function DeltaDetail() {
       {/* USAGE */}
       <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-5 mb-6">
         <div className="flex items-center gap-6 text-[13px] text-slate-500 font-medium flex-wrap">
-          <span>Model: <strong className="text-slate-700">{String(usage.model ?? '')}</strong></span>
+          <span>Model: <strong className="text-slate-700">{displayModelName(usage.model)}</strong></span>
           <span>Tokens: <strong className="text-slate-700">{String(usage.input_tokens).replace(/\B(?=(\d{3})+(?!\d))/g, ',')} in</strong> / <strong className="text-slate-700">{String(usage.output_tokens).replace(/\B(?=(\d{3})+(?!\d))/g, ',')} out</strong></span>
           <span>Time: <strong className="text-slate-700">{Number(usage.elapsed_seconds)}s</strong></span>
         </div>

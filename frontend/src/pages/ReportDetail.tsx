@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { api } from '../lib/api'
+import { api, displayModelName, type ReportDoc, type PainReportCard, type PainPoint, type DataSignals, type StakeholderAssessment, type HypothesisUpdates } from '../lib/api'
 import {
   ArrowLeft, AlertTriangle, Users, Database, ShieldCheck, Quote, Download,
   Server, HelpCircle, Lightbulb, ListChecks, Clock, User,
@@ -41,7 +41,7 @@ function notEmpty(v: unknown): boolean {
 
 export default function ReportDetail() {
   const { id } = useParams<{ id: string }>()
-  const [doc, setDoc] = useState<Record<string, unknown> | null>(null)
+  const [doc, setDoc] = useState<ReportDoc | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -70,18 +70,18 @@ export default function ReportDetail() {
     )
   }
 
-  const card = (doc.report_card || {}) as Record<string, unknown>
-  const meta = (card.meta || {}) as Record<string, unknown>
-  const painPoints = (card.pain_points || []) as Record<string, unknown>[]
-  const ds = (card.data_signals || card.data_signals_identified || {}) as Record<string, unknown>
-  const sa = (card.stakeholder_assessment || {}) as Record<string, unknown>
-  const keyNums = (card.key_numbers || {}) as Record<string, unknown>
-  const openQ = (card.open_questions || []) as string[]
-  const hyp = (card.hypothesis_updates || {}) as Record<string, unknown>
-  const nextSteps = (card.recommended_next_steps || []) as string[]
-  const quoteCheck = (doc.quote_check || []) as { quote: string; found: boolean }[]
-  const callType = (doc.call_type || meta.call_type || '') as string
-  const usage = (doc.usage || {}) as Record<string, unknown>
+  const card: PainReportCard = doc.report_card || {}
+  const meta = card.meta || {}
+  const painPoints: PainPoint[] = card.pain_points || []
+  const ds: DataSignals = card.data_signals || card.data_signals_identified || {}
+  const sa: StakeholderAssessment = card.stakeholder_assessment || {}
+  const keyNums = card.key_numbers || {}
+  const openQ: string[] = card.open_questions || []
+  const hyp: HypothesisUpdates = card.hypothesis_updates || {}
+  const nextSteps: string[] = card.recommended_next_steps || []
+  const quoteCheck = doc.quote_check || []
+  const callType = doc.call_type || meta.call_type || ''
+  const usage = doc.usage || {}
 
   return (
     <div className="space-y-7">
@@ -154,9 +154,9 @@ export default function ReportDetail() {
         <div className="space-y-5">
           {painPoints.map((pp, i) => {
             const sev = typeof pp.severity === 'number' ? pp.severity : 5
-            const cost = (pp.cost_estimate || {}) as Record<string, unknown>
-            const aff = (pp.affected_stakeholders || []) as string[]
-            const quotes = (pp.source_quotes || []) as string[]
+            const cost = pp.cost_estimate || {}
+            const aff = pp.affected_stakeholders || []
+            const quotes = pp.source_quotes || []
             return (
               <div key={i} className={`border-2 rounded-3xl overflow-hidden ${getSevClass(sev)}`}>
                 <div className="px-6 py-5">
@@ -340,7 +340,7 @@ export default function ReportDetail() {
       {/* USAGE */}
       <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-5 mb-6">
         <div className="flex items-center gap-6 text-[13px] text-slate-500 font-medium flex-wrap">
-          <span>Model: <strong className="text-slate-700">{String(usage.model ?? '')}</strong></span>
+          <span>Model: <strong className="text-slate-700">{displayModelName(usage.model)}</strong></span>
           <span>Tokens: <strong className="text-slate-700">{String(usage.input_tokens).replace(/\B(?=(\d{3})+(?!\d))/g, ',')} in</strong> / <strong className="text-slate-700">{String(usage.output_tokens).replace(/\B(?=(\d{3})+(?!\d))/g, ',')} out</strong></span>
           <span>Time: <strong className="text-slate-700">{Number(usage.elapsed_seconds)}s</strong></span>
         </div>

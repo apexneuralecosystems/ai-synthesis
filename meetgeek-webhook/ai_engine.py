@@ -1,12 +1,11 @@
 """
-AI engine: analyze meeting transcripts with OpenAI GPT-4 and store structured insights.
+AI engine: analyze meeting transcripts with Anthropic Opus 4.6 only (OpenRouter or direct Anthropic).
 Retries up to 3 times on failure; transcript is always saved even if AI fails.
 """
 import json
 import logging
+import os
 from typing import Any
-
-from openai import AsyncOpenAI
 
 from config import get_settings
 from database import get_database, get_meeting, update_meeting
@@ -14,6 +13,13 @@ from database import get_database, get_meeting, update_meeting
 logger = logging.getLogger(__name__)
 
 MAX_RETRIES = 3
+
+OPENROUTER_API_KEY = (
+    os.environ.get("openrouter_api_key") or os.environ.get("OPENROUTER_API_KEY") or ""
+).strip()
+OPENROUTER_OPUS_MODEL = "anthropic/claude-opus-4.6"
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+ANTHROPIC_OPUS_MODEL = "claude-opus-4-6"
 
 SYSTEM_PROMPT = """You are an expert meeting analyst. Analyze the meeting transcript and return a JSON object with exactly these keys (use null where not applicable):
 - executive_summary: string (2-4 sentences)
@@ -25,18 +31,51 @@ SYSTEM_PROMPT = """You are an expert meeting analyst. Analyze the meeting transc
 Return only valid JSON, no markdown or extra text."""
 
 
+async def _call_opus_openrouter(user_content: str) -> str:
+    """Call OpenRouter with Anthropic Opus 4.6. Returns response text."""
+    from openai import AsyncOpenAI
+    client = AsyncOpenAI(
+        api_key=OPENROUTER_API_KEY,
+        base_url="https://openrouter.ai/api/v1",
+    )
+    resp = await client.chat.completions.create(
+        model=OPENROUTER_OPUS_MODEL,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_content[:120000]},
+        ],
+        temperature=0.2,
+    )
+    return (resp.choices[0].message.content or "{}").strip()
+
+
+async def _call_opus_anthropic(user_content: str) -> str:
+    """Call Anthropic API with Opus 4.6. Returns response text."""
+    import anthropic
+    client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
+    resp = await client.messages.create(
+        model=ANTHROPIC_OPUS_MODEL,
+        max_tokens=8192,
+        system=SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": user_content[:120000]}],
+        temperature=0.2,
+    )
+    if not resp.content:
+        return "{}"
+    return (resp.content[0].text if hasattr(resp.content[0], "text") else str(resp.content[0])).strip()
+
+
 async def analyze_transcript(
     transcript: str,
     title: str | None = None,
     participants: list | dict | None = None,
 ) -> dict[str, Any]:
     """
-    Use OpenAI GPT-4 to extract key decisions, action items, risks, summary, sentiment.
-    Returns structured JSON with all insights.
+    Use Anthropic Opus 4.6 only (OpenRouter or direct Anthropic) to extract key decisions,
+    action items, risks, summary, sentiment. Returns structured JSON with all insights.
     """
-    settings = get_settings()
-    if not settings.openai_api_key:
-        logger.warning("OPENAI_API_KEY not set; skipping AI analysis")
+    if not OPENROUTER_API_KEY and not ANTHROPIC_API_KEY:
+        logger.warning("OPENROUTER_API_KEY and ANTHROPIC_API_KEY not set; skipping AI analysis")
         return {
             "executive_summary": None,
             "key_decisions": [],
@@ -44,10 +83,9 @@ async def analyze_transcript(
             "risks_or_blockers": [],
             "sentiment": None,
             "topics": [],
-            "error": "OPENAI_API_KEY not set",
+            "error": "OPENROUTER_API_KEY or ANTHROPIC_API_KEY required for Opus 4.6",
         }
 
-    client = AsyncOpenAI(api_key=settings.openai_api_key)
     title_str = title or "Meeting"
     participants_str = ""
     if participants:
@@ -63,16 +101,19 @@ async def analyze_transcript(
         user_content += f"Participants: {participants_str}\n\n"
     user_content += "Transcript:\n" + (transcript or "")
 
-    response = await client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_content[:120000]},
-        ],
-        temperature=0.2,
-    )
-    text = response.choices[0].message.content or "{}"
-    text = text.strip()
+    text = "{}"
+    if OPENROUTER_API_KEY:
+        try:
+            text = await _call_opus_openrouter(user_content)
+        except Exception as e:
+            logger.warning("OpenRouter failed, trying Anthropic: %s", e)
+            if ANTHROPIC_API_KEY:
+                text = await _call_opus_anthropic(user_content)
+            else:
+                raise
+    else:
+        text = await _call_opus_anthropic(user_content)
+
     if text.startswith("```"):
         lines = text.split("\n")
         text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])

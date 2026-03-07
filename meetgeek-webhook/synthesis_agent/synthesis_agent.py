@@ -130,43 +130,19 @@ def build_delta_user_message(report_cards: list[dict]) -> str:
     return "\n".join(parts)
 
 
-def call_claude(system_prompt: str, user_message: str) -> tuple[str, dict]:
-    """Call Anthropic Claude API. Returns (response_text, usage_info)."""
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        raise EnvironmentError("ANTHROPIC_API_KEY not set. Add it to .env file.")
-    import anthropic
-    client = anthropic.Anthropic(api_key=api_key)
-    start = time.time()
-    response = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=8192,
-        system=system_prompt,
-        messages=[{"role": "user", "content": user_message}],
-    )
-    elapsed = time.time() - start
-    text = response.content[0].text
-    usage = {
-        "model": "claude-sonnet-4-20250514",
-        "input_tokens": response.usage.input_tokens,
-        "output_tokens": response.usage.output_tokens,
-        "elapsed_seconds": round(elapsed, 2),
-    }
-    logger.info("Claude: %d in / %d out tokens, %.2fs",
-                usage["input_tokens"], usage["output_tokens"], elapsed)
-    return text, usage
+OPENROUTER_API_KEY = (os.environ.get("openrouter_api_key") or os.environ.get("OPENROUTER_API_KEY") or "").strip()
+OPENROUTER_OPUS_MODEL = "anthropic/claude-opus-4.6"
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+ANTHROPIC_OPUS_MODEL = "claude-opus-4-6"
 
 
-def call_openai(system_prompt: str, user_message: str) -> tuple[str, dict]:
-    """Call OpenAI GPT-4o API. Returns (response_text, usage_info)."""
-    api_key = os.environ.get("OPENAI_API_KEY", "")
-    if not api_key:
-        raise EnvironmentError("OPENAI_API_KEY not set. Add it to .env file.")
+def _call_opus_openrouter(system_prompt: str, user_message: str) -> tuple[str, dict]:
+    """Call OpenRouter with Anthropic Opus 4.6. Returns (response_text, usage_info)."""
     import openai
-    client = openai.OpenAI(api_key=api_key)
+    client = openai.OpenAI(api_key=OPENROUTER_API_KEY, base_url="https://openrouter.ai/api/v1")
     start = time.time()
     response = client.chat.completions.create(
-        model="gpt-4o",
+        model=OPENROUTER_OPUS_MODEL,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message},
@@ -176,23 +152,60 @@ def call_openai(system_prompt: str, user_message: str) -> tuple[str, dict]:
     elapsed = time.time() - start
     text = response.choices[0].message.content or ""
     usage = {
-        "model": "gpt-4o",
+        "model": OPENROUTER_OPUS_MODEL,
         "input_tokens": response.usage.prompt_tokens,
         "output_tokens": response.usage.completion_tokens,
         "elapsed_seconds": round(elapsed, 2),
     }
-    logger.info("OpenAI: %d in / %d out tokens, %.2fs",
-                usage["input_tokens"], usage["output_tokens"], elapsed)
+    logger.info("OpenRouter %s: %d in / %d out, %.2fs",
+                OPENROUTER_OPUS_MODEL, usage["input_tokens"], usage["output_tokens"], elapsed)
     return text, usage
 
 
+def _call_opus_anthropic(system_prompt: str, user_message: str) -> tuple[str, dict]:
+    """Call Anthropic API with Opus 4.6. Returns (response_text, usage_info)."""
+    import anthropic
+    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+    start = time.time()
+    response = client.messages.create(
+        model=ANTHROPIC_OPUS_MODEL,
+        max_tokens=8192,
+        system=system_prompt,
+        messages=[{"role": "user", "content": user_message}],
+        temperature=0.2,
+    )
+    elapsed = time.time() - start
+    text = (response.content[0].text if response.content else "") or ""
+    usage = {
+        "model": ANTHROPIC_OPUS_MODEL,
+        "input_tokens": response.usage.input_tokens,
+        "output_tokens": response.usage.output_tokens,
+        "elapsed_seconds": round(elapsed, 2),
+    }
+    logger.info("Anthropic %s: %d in / %d out, %.2fs",
+                ANTHROPIC_OPUS_MODEL, usage["input_tokens"], usage["output_tokens"], elapsed)
+    return text, usage
+
+
+def call_claude(system_prompt: str, user_message: str) -> tuple[str, dict]:
+    """Call Anthropic Opus 4.6 (direct API). Returns (response_text, usage_info)."""
+    if not ANTHROPIC_API_KEY:
+        raise EnvironmentError("ANTHROPIC_API_KEY not set. Add it to .env file.")
+    return _call_opus_anthropic(system_prompt, user_message)
+
+
 def call_llm(system_prompt: str, user_message: str) -> tuple[str, dict]:
-    """Try Claude first; fall back to GPT-4o on any failure."""
-    try:
-        return call_claude(system_prompt, user_message)
-    except Exception as e:
-        logger.warning("Claude failed (%s), falling back to GPT-4o", e)
-        return call_openai(system_prompt, user_message)
+    """Use Anthropic Opus 4.6 only: OpenRouter first, then direct Anthropic. No GPT-4o."""
+    if OPENROUTER_API_KEY:
+        try:
+            return _call_opus_openrouter(system_prompt, user_message)
+        except Exception as e:
+            logger.warning("OpenRouter failed (%s), trying Anthropic", e)
+    if ANTHROPIC_API_KEY:
+        return _call_opus_anthropic(system_prompt, user_message)
+    raise EnvironmentError(
+        "OPENROUTER_API_KEY (or openrouter_api_key) or ANTHROPIC_API_KEY must be set for Opus 4.6."
+    )
 
 
 def parse_json_response(text: str) -> dict:

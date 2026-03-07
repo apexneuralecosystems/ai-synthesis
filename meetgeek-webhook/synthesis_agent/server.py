@@ -50,6 +50,9 @@ OPENROUTER_API_KEY = (
     os.environ.get("openrouter_api_key") or os.environ.get("OPENROUTER_API_KEY") or ""
 )
 OPENROUTER_OPUS_MODEL = "anthropic/claude-opus-4.6"
+# Direct Anthropic fallback when OpenRouter is unset or fails (model id per Anthropic docs)
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+ANTHROPIC_OPUS_MODEL = "claude-opus-4-6"
 MONGODB_URI = os.environ.get("MONGODB_URI", "")
 MONGODB_DB = os.environ.get("MONGODB_DB_NAME", "meetgeek")
 # Use TLS CA only for mongodb+srv (Atlas). Plain mongodb:// (e.g. internal) uses no TLS by default.
@@ -140,12 +143,12 @@ def serialize(doc: dict) -> dict:
     return out
 
 
-# ═══════════════ LLM (OpenRouter Anthropic Opus 4.6 primary, OpenAI fallback) ═══════════════
+# ═══════════════ LLM (Anthropic Opus 4.6 only: OpenRouter primary, direct Anthropic fallback) ═══════════════
 
 def call_gpt4o(system_prompt: str, user_message: str) -> tuple[str, dict]:
     """
-    Use OpenRouter with Anthropic Opus 4.6 only; fall back to OpenAI GPT-4o if OpenRouter
-    is unset or fails. Returns (text, usage).
+    Use Anthropic Opus 4.6 only: OpenRouter primary; fall back to direct Anthropic API.
+    No GPT-4o or other models. Returns (text, usage).
     """
     import openai
 
@@ -154,7 +157,7 @@ def call_gpt4o(system_prompt: str, user_message: str) -> tuple[str, dict]:
         {"role": "user", "content": user_message},
     ]
 
-    # Primary: OpenRouter with Anthropic Opus 4.6 only
+    # Primary: OpenRouter with Anthropic Opus 4.6
     if OPENROUTER_API_KEY.strip():
         try:
             client = openai.OpenAI(
@@ -184,31 +187,44 @@ def call_gpt4o(system_prompt: str, user_message: str) -> tuple[str, dict]:
             )
             return text, usage
         except Exception as e:
-            logger.warning("OpenRouter failed, falling back to OpenAI: %s", e)
+            logger.warning("OpenRouter failed, falling back to Anthropic: %s", e)
 
-    # Fallback: OpenAI GPT-4o
-    if not (OPENAI_API_KEY or "").strip():
+    # Fallback: direct Anthropic API with Opus 4.6 only
+    if not ANTHROPIC_API_KEY:
         raise HTTPException(
             500,
-            "OpenRouter (OPENROUTER_API_KEY or openrouter_api_key) or OpenAI (OPENAI_API_KEY) must be set",
+            "OpenRouter (OPENROUTER_API_KEY or openrouter_api_key) or Anthropic (ANTHROPIC_API_KEY) must be set for Opus 4.6",
         )
-    client = openai.OpenAI(api_key=OPENAI_API_KEY.strip())
-    start = time.time()
-    resp = client.chat.completions.create(
-        model="gpt-4o",
-        messages=messages,
-        temperature=0.2,
-    )
-    elapsed = time.time() - start
-    text = resp.choices[0].message.content or ""
-    usage = {
-        "model": "gpt-4o",
-        "input_tokens": resp.usage.prompt_tokens,
-        "output_tokens": resp.usage.completion_tokens,
-        "elapsed_seconds": round(elapsed, 2),
-    }
-    logger.info("OpenAI gpt-4o fallback: %d in / %d out, %.1fs", usage["input_tokens"], usage["output_tokens"], elapsed)
-    return text, usage
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        start = time.time()
+        resp = client.messages.create(
+            model=ANTHROPIC_OPUS_MODEL,
+            max_tokens=8192,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_message}],
+            temperature=0.2,
+        )
+        elapsed = time.time() - start
+        text = (resp.content[0].text if resp.content else "") or ""
+        usage = {
+            "model": ANTHROPIC_OPUS_MODEL,
+            "input_tokens": resp.usage.input_tokens,
+            "output_tokens": resp.usage.output_tokens,
+            "elapsed_seconds": round(elapsed, 2),
+        }
+        logger.info(
+            "Anthropic %s: %d in / %d out, %.1fs",
+            ANTHROPIC_OPUS_MODEL,
+            usage["input_tokens"],
+            usage["output_tokens"],
+            elapsed,
+        )
+        return text, usage
+    except Exception as e:
+        logger.exception("Anthropic Opus 4.6 call failed: %s", e)
+        raise HTTPException(500, f"Anthropic Opus 4.6 required but call failed: {e}")
 
 
 # ═══════════════ Helpers ═══════════════
@@ -375,8 +391,8 @@ async def startup():
 async def health():
     return {
         "status": "ok",
-        "llm": OPENROUTER_OPUS_MODEL if OPENROUTER_API_KEY.strip() else "gpt-4o",
-        "api_key_set": bool(OPENROUTER_API_KEY.strip() or (OPENAI_API_KEY or "").strip()),
+        "llm": OPENROUTER_OPUS_MODEL if OPENROUTER_API_KEY.strip() else ANTHROPIC_OPUS_MODEL,
+        "api_key_set": bool(OPENROUTER_API_KEY.strip() or ANTHROPIC_API_KEY),
     }
 
 

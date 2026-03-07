@@ -25,8 +25,11 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from pymongo import MongoClient, DESCENDING
 
-# Load shared config only from the parent meetgeek-webhook .env
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+# Load .env: try cwd and parent first, then meetgeek-webhook .env last so it wins (openrouter_api_key etc.)
+_base = Path(__file__).resolve().parent.parent
+for _env_path in (Path.cwd() / ".env", _base.parent / ".env", _base / ".env"):
+    if _env_path.exists():
+        load_dotenv(_env_path, override=True)
 
 _base = Path(__file__).resolve().parent.parent
 if str(_base) not in sys.path:
@@ -44,11 +47,11 @@ from schemas.llm_models import validate_pain_report_response, validate_delta_rep
 PROMPTS_DIR = BASE_DIR / "prompts"
 SCHEMAS_DIR = BASE_DIR / "schemas"
 
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+OPENAI_API_KEY = (os.environ.get("OPENAI_API_KEY") or "").strip()
 # OpenRouter: env var openrouter_api_key (or OPENROUTER_API_KEY); model anthropic/claude-opus-4.6 only
 OPENROUTER_API_KEY = (
-    os.environ.get("openrouter_api_key") or os.environ.get("OPENROUTER_API_KEY") or ""
-)
+    (os.environ.get("openrouter_api_key") or os.environ.get("OPENROUTER_API_KEY")) or ""
+).strip()
 OPENROUTER_OPUS_MODEL = "anthropic/claude-opus-4.6"
 # Direct Anthropic fallback when OpenRouter is unset or fails (model id per Anthropic docs)
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
@@ -193,7 +196,7 @@ def call_gpt4o(system_prompt: str, user_message: str) -> tuple[str, dict]:
     if not ANTHROPIC_API_KEY:
         raise HTTPException(
             500,
-            "OpenRouter (OPENROUTER_API_KEY or openrouter_api_key) or Anthropic (ANTHROPIC_API_KEY) must be set for Opus 4.6",
+            "OpenRouter or Anthropic key required for Opus 4.6. Set openrouter_api_key or OPENROUTER_API_KEY (or ANTHROPIC_API_KEY) in .env and restart. If using Docker, pass the key in the container environment.",
         )
     try:
         import anthropic
@@ -370,6 +373,11 @@ class ChatReq(BaseModel):
 
 @app.on_event("startup")
 async def startup():
+    logger.info(
+        "LLM config: OpenRouter key set=%s, Anthropic key set=%s (need at least one for Opus 4.6)",
+        bool(OPENROUTER_API_KEY),
+        bool(ANTHROPIC_API_KEY),
+    )
     # Run async Mongo migrations (indexes, collections) and ensure report collections.
     try:
         await init_db()
